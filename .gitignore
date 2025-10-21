@@ -1,1 +1,4 @@
 /vendor/
+/*.pdf
+/test.php
+/test_pdf_qr.php
