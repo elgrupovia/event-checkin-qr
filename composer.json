@@ -1,0 +1,15 @@
+{
+    "name": "it2/event-checkin-qr",
+    "autoload": {
+        "psr-4": {
+            "It2\\EventCheckinQr\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Grupo Via",
+            "email": "grupoviabcn@gmail.com"
+        }
+    ],
+    "require": {}
+}
