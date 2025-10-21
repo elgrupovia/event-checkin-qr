@@ -11,5 +11,8 @@
             "email": "grupoviabcn@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "tecnickcom/tcpdf": "^6.10",
+        "endroid/qr-code": "^6.0"
+    }
 }
