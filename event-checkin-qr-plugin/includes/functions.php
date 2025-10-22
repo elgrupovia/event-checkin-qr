@@ -27,11 +27,18 @@ add_action('all', function($hook_name) {
 function generar_qr_pdf_personalizado($request, $action_handler) {
     error_log("🚀 [inscripciones_qr] Hook ejecutado");
 
+    // 🔹 Log de todos los datos recibidos del formulario
+    error_log("📌 Datos completos del formulario: " . print_r($request, true));
+
     try {
         // 1️⃣ Obtener datos del formulario
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
+
+        // 🔹 Detectar post_id dinámico del evento (reemplazar 'evento_id' por el nombre correcto del campo)
+        $post_id = isset($request['evento_id']) ? intval($request['evento_id']) : 0;
+        error_log("📌 Post ID del evento detectado: " . $post_id);
 
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
@@ -53,9 +60,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF();
         $pdf->AddPage();
 
-        // 4a️⃣ Obtener imagen del evento desde custom field
-        $post_id = 53788; // ID del evento
-        $imagen_evento_url = get_post_meta($post_id, 'imagen_evento', true); // reemplaza 'imagen_evento' con tu meta key real
+        // 🔹 Obtener imagen del evento desde custom field
+        $imagen_evento_url = $post_id ? get_post_meta($post_id, 'imagen_evento', true) : '';
         if ($imagen_evento_url) {
             // Convertir URL de uploads a ruta absoluta
             $imagen_evento_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_evento_url);
@@ -90,7 +96,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 }
 
 // Hook JetFormBuilder — acción personalizada "inscripciones_qr"
-add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_personalizado', 10, 3);
+add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_personalizado', 10, 2);
 
 // Confirmación de carga del archivo functions.php
 error_log("✅ functions.php (QR personalizado) cargado correctamente");
