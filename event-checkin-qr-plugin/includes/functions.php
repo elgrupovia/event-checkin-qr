@@ -1,75 +1,79 @@
 <?php
 /**
- * functions.php del plugin Event Check-In QR
- * Código para generar QR y PDF dentro de WordPress
+ * Plugin: Event Check-In QR
+ * Integración con JetFormBuilder
  */
 
-if (!defined('ABSPATH')) {
-    exit; // Evita acceso directo
-}
+if (!defined('ABSPATH')) exit;
 
-// ✅ Incluir autoload de Composer
+// Cargar dependencias de Composer
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use TCPDF;
 
 /**
- * Función principal para generar PDF con QR
+ * Hook JetFormBuilder: genera QR y PDF personalizados al enviar formulario
  */
-function generar_qr_pdf() {
+add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_personalizado', 10, 3);
+
+function generar_qr_pdf_personalizado($request, $action_handler, $action = null) {
     try {
-        // 1️⃣ Generar el QR
-        $qrResult = Builder::create()
-            ->writer(new PngWriter())
-            ->data('Asistencia evento - Usuario: Test')
-            ->size(300)
-            ->margin(10)
-            ->build();
+        // 🔹 1️⃣ Extraer los campos del formulario JetFormBuilder
+        // Asegúrate de usar los names reales de tus campos del form
+        $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
+        $nombre_persona = isset($request['nombre_persona']) ? sanitize_text_field($request['nombre_persona']) : 'Usuario';
+        $cargo          = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo';
+
+        // 🔹 2️⃣ Crear el contenido del QR
+        $qr_text = "Empresa: $nombre_empresa\nNombre: $nombre_persona\nCargo: $cargo";
+
+        // Generar el QR
+        $qrCode = QrCode::create($qr_text)->setSize(300)->setMargin(10);
+        $writer = new PngWriter();
+        $qrResult = $writer->write($qrCode);
 
         // Guardar QR temporal
-        $qrPath = __DIR__ . '/../qr_test.png';
+        $qrPath = __DIR__ . '/../qr_temp.png';
         $qrResult->saveToFile($qrPath);
 
-        // 2️⃣ Crear PDF con TCPDF
+        // 🔹 3️⃣ Crear el PDF personalizado
         $pdf = new TCPDF();
         $pdf->AddPage();
-        $pdf->SetFont('helvetica', '', 16);
-        $pdf->Cell(0, 10, '¡Hola! Este es un PDF con QR para check-in.', 0, 1, 'C');
+        $pdf->SetFont('helvetica', '', 14);
+        $pdf->Cell(0, 10, '🎟️ Check-In de Evento', 0, 1, 'C');
+        $pdf->Ln(10);
+        $pdf->SetFont('helvetica', '', 12);
+        $pdf->Cell(0, 10, "Empresa: $nombre_empresa", 0, 1);
+        $pdf->Cell(0, 10, "Nombre: $nombre_persona", 0, 1);
+        $pdf->Cell(0, 10, "Cargo: $cargo", 0, 1);
+        $pdf->Ln(10);
+        $pdf->Image($qrPath, 70, 100, 70, 70, 'PNG');
 
-        // Insertar QR en PDF
-        $pdf->Image($qrPath, 70, 40, 70, 70, 'PNG');
+        // 🔹 4️⃣ Guardar PDF
+        $upload_dir = wp_upload_dir();
+        $pdf_filename = 'checkin_' . sanitize_title($nombre_persona) . '.pdf';
+        $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
+        $pdf_url  = $upload_dir['baseurl'] . '/' . $pdf_filename;
 
-        // Guardar PDF final
-        $pdfPath = __DIR__ . '/../pdf_test.pdf';
-        $pdf->Output($pdfPath, 'F');
+        $pdf->Output($pdf_path, 'F');
 
-        // Limpiar archivo temporal
+        // Borrar QR temporal
         unlink($qrPath);
 
-        echo '<div class="notice notice-success"><p>✅ PDF generado correctamente: pdf_test.pdf</p></div>';
+        // 🔹 5️⃣ (Opcional) Registrar mensaje de éxito o redirigir
+        error_log("✅ PDF generado: $pdf_path");
+
+        // 🔹 6️⃣ (Opcional) Devolver resultado a JetFormBuilder
+        if (method_exists($action_handler, 'add_message')) {
+            $action_handler->add_message('PDF generado correctamente: ' . $pdf_url);
+        }
 
     } catch (Exception $e) {
-        echo '<div class="notice notice-error"><p>❌ Error: ' . $e->getMessage() . '</p></div>';
+        error_log('❌ Error al generar QR/PDF: ' . $e->getMessage());
+        if (method_exists($action_handler, 'add_error')) {
+            $action_handler->add_error('Error al generar el PDF con QR: ' . $e->getMessage());
+        }
     }
 }
-
-/**
- * Hook para añadir página de administración
- */
-add_action('admin_menu', function() {
-    add_menu_page(
-        'Generar QR/PDF',       // Título página
-        'QR/PDF',               // Título menú
-        'manage_options',       // Permiso
-        'qr_pdf_page',          // Slug
-        function() {            // Callback contenido
-            echo '<div class="wrap"><h1>Generar PDF con QR</h1>';
-            if (isset($_POST['generar'])) {
-                generar_qr_pdf();
-            }
-            echo '<form method="post"><button name="generar" class="button button-primary">Generar PDF</button></form></div>';
-        }
-    );
-});
