@@ -24,7 +24,7 @@ add_action('all', function($hook_name) {
 /**
  * Función que genera el PDF con QR personalizado y la imagen del evento desde custom field
  */
-function generar_qr_pdf_personalizado($result, $request, $action_handler) {
+function generar_qr_pdf_personalizado($request, $action_handler) {
     error_log("🚀 [inscripciones_qr] Hook ejecutado");
 
     try {
