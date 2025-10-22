@@ -22,9 +22,9 @@ add_action('all', function($hook_name) {
 });
 
 /**
- * Función que genera el PDF con QR personalizado
+ * Función que genera el PDF con QR personalizado y la imagen del evento desde custom field
  */
-function generar_qr_pdf_personalizado($request, $action_handler) {
+function generar_qr_pdf_personalizado($result, $request, $action_handler) {
     error_log("🚀 [inscripciones_qr] Hook ejecutado");
 
     try {
@@ -52,19 +52,29 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // 4️⃣ Crear PDF con TCPDF
         $pdf = new TCPDF();
         $pdf->AddPage();
+
+        // 4a️⃣ Obtener imagen del evento desde custom field
+        $post_id = 53788; // ID del evento
+        $imagen_evento_url = get_post_meta($post_id, 'imagen_evento', true); // reemplaza 'imagen_evento' con tu meta key real
+        if ($imagen_evento_url) {
+            // Convertir URL de uploads a ruta absoluta
+            $imagen_evento_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_evento_url);
+            $pdf->Image($imagen_evento_path, 15, 20, 180, 60);
+        }
+
+        // 4b️⃣ Agregar texto del PDF
+        $pdf->Ln(70); // dejar espacio debajo de la imagen
         $pdf->SetFont('helvetica', '', 14);
         $pdf->Cell(0, 10, 'Entrada para el evento', 0, 1, 'C');
-        $pdf->Ln(10);
-
         $pdf->SetFont('helvetica', '', 12);
         $pdf->Cell(0, 10, "Empresa: {$nombre_empresa}", 0, 1);
         $pdf->Cell(0, 10, "Nombre: {$nombre_persona}", 0, 1);
         $pdf->Cell(0, 10, "Cargo: {$cargo_persona}", 0, 1);
 
-        $pdf->Ln(10);
-        $pdf->Image($qrPath, 70, 90, 70, 70, 'PNG');
+        // 4c️⃣ Insertar QR
+        $pdf->Image($qrPath, 70, 150, 70, 70, 'PNG');
 
-        // 5️⃣ Guardar el PDF final
+        // 5️⃣ Guardar PDF final
         $pdf_filename = 'entrada_qr_' . time() . '.pdf';
         $pdfPath = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdfPath, 'F');
