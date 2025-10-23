@@ -23,7 +23,8 @@ add_action('all', function($hook_name) {
 
 /**
  * Función principal: genera el PDF con QR + imagen del evento
- */function generar_qr_pdf_personalizado($request, $action_handler) {
+ */
+function generar_qr_pdf_personalizado($request, $action_handler) {
     error_log("🚀 [inscripciones_qr] Hook ejecutado");
     error_log("📥 Datos completos del formulario: " . print_r($request, true));
 
@@ -37,38 +38,92 @@ add_action('all', function($hook_name) {
         $evento_nombre = isset($request['eventos_2025'][0]) ? sanitize_text_field($request['eventos_2025'][0]) : '';
         error_log("🔎 Nombre del evento recibido desde el formulario: " . $evento_nombre);
 
-        // 🧠 Buscar el evento por título exacto (no solo coincidencia parcial)
+        // 🧹 Limpiar el nombre del evento: normalizar espacios y caracteres
+        $evento_nombre_limpio = trim(preg_replace('/\s+/', ' ', $evento_nombre));
+        error_log("🧹 Nombre del evento después de limpiar: " . $evento_nombre_limpio);
+
         global $wpdb;
+        
+        // 🎯 ESTRATEGIA 1: Búsqueda exacta con nombre limpio
         $post_id = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT ID FROM $wpdb->posts 
-                 WHERE post_title = %s 
+                 WHERE TRIM(REPLACE(post_title, '  ', ' ')) = %s 
                  AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                  AND post_status = 'publish' 
                  LIMIT 1",
-                $evento_nombre
+                $evento_nombre_limpio
             )
         );
 
         if (!$post_id) {
-            error_log("⚠️ No se encontró ningún evento con título EXACTO: {$evento_nombre}");
-            // Intento secundario: buscar parcialmente
+            error_log("⚠️ Intento 1 fallido. Probando búsqueda parcial...");
+            
+            // 🎯 ESTRATEGIA 2: Búsqueda por LIKE con limpieza
             $post_id = $wpdb->get_var(
                 $wpdb->prepare(
                     "SELECT ID FROM $wpdb->posts 
-                     WHERE post_title LIKE %s 
+                     WHERE TRIM(REPLACE(post_title, '  ', ' ')) LIKE %s 
                      AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                      AND post_status = 'publish' 
                      LIMIT 1",
-                    '%' . $wpdb->esc_like($evento_nombre) . '%'
+                    '%' . $wpdb->esc_like($evento_nombre_limpio) . '%'
                 )
             );
         }
 
+        if (!$post_id) {
+            error_log("⚠️ Intento 2 fallido. Probando búsqueda por palabras clave...");
+            
+            // 🎯 ESTRATEGIA 3: Extraer palabras clave principales
+            $palabras_clave = explode(' ', $evento_nombre_limpio);
+            $palabras_principales = array_filter($palabras_clave, function($palabra) {
+                return strlen($palabra) > 3; // Solo palabras de más de 3 caracteres
+            });
+            
+            if (count($palabras_principales) >= 2) {
+                $primera_palabra = $palabras_principales[0];
+                $segunda_palabra = $palabras_principales[1];
+                
+                error_log("🔑 Buscando con palabras clave: {$primera_palabra} y {$segunda_palabra}");
+                
+                $post_id = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT ID FROM $wpdb->posts 
+                         WHERE post_title LIKE %s 
+                         AND post_title LIKE %s
+                         AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                         AND post_status = 'publish' 
+                         LIMIT 1",
+                        '%' . $wpdb->esc_like($primera_palabra) . '%',
+                        '%' . $wpdb->esc_like($segunda_palabra) . '%'
+                    )
+                );
+            }
+        }
+
+        if (!$post_id) {
+            error_log("⚠️ Intento 3 fallido. Listando todos los eventos disponibles...");
+            
+            // 📋 Listar todos los eventos para diagnóstico
+            $eventos_disponibles = $wpdb->get_results(
+                "SELECT ID, post_title FROM $wpdb->posts 
+                 WHERE post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                 AND post_status = 'publish' 
+                 ORDER BY post_date DESC
+                 LIMIT 10"
+            );
+            
+            error_log("📋 Eventos disponibles en la base de datos:");
+            foreach ($eventos_disponibles as $evento) {
+                error_log("   - ID: {$evento->ID} | Título: {$evento->post_title}");
+            }
+        }
+
         if ($post_id) {
-            error_log("📌 Evento correcto encontrado: ID={$post_id}, Título=" . get_the_title($post_id));
+            error_log("✅ Evento encontrado: ID={$post_id}, Título=" . get_the_title($post_id));
         } else {
-            error_log("❌ No se encontró ningún evento ni por coincidencia parcial ni exacta.");
+            error_log("❌ No se encontró ningún evento después de 3 intentos. Continuando sin imagen.");
         }
 
         // 🧾 Generar QR
