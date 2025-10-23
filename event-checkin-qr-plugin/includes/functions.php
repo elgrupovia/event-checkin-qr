@@ -23,88 +23,88 @@ add_action('all', function($hook_name) {
 
 /**
  * Función principal: genera el PDF con QR + imagen del evento
- */
-function generar_qr_pdf_personalizado($request, $action_handler) {
+ */function generar_qr_pdf_personalizado($request, $action_handler) {
     error_log("🚀 [inscripciones_qr] Hook ejecutado");
-
-    // Log de todos los datos del formulario
     error_log("📥 Datos completos del formulario: " . print_r($request, true));
 
     try {
-        // 1️⃣ Obtener datos del formulario
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // 2️⃣ Buscar evento por el título recibido desde el formulario
+        // 📌 Título del evento desde JetFormBuilder
         $evento_nombre = isset($request['eventos_2025'][0]) ? sanitize_text_field($request['eventos_2025'][0]) : '';
         error_log("🔎 Nombre del evento recibido desde el formulario: " . $evento_nombre);
 
-        // 👇 Asegúrate de que este sea el slug correcto de tu CPT de eventos
-        $args = array(
-            'post_type'      => 'evento', // 🔥 cambia esto si tu CPT se llama diferente
-            'posts_per_page' => 1,
-            's'              => $evento_nombre, // búsqueda parcial por título
-            'orderby'        => 'date',
-            'order'          => 'DESC',
+        // 🧠 Buscar el evento por título exacto (no solo coincidencia parcial)
+        global $wpdb;
+        $post_id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT ID FROM $wpdb->posts 
+                 WHERE post_title = %s 
+                 AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                 AND post_status = 'publish' 
+                 LIMIT 1",
+                $evento_nombre
+            )
         );
 
-        $query = new WP_Query($args);
-        $post_id = 0;
-
-        if ($query->have_posts()) {
-            $query->the_post();
-            $post_id = get_the_ID();
-            $titulo_encontrado = get_the_title($post_id);
-            error_log("📌 Evento encontrado: ID={$post_id}, Título={$titulo_encontrado}");
-        } else {
-            error_log("⚠️ No se encontró ningún evento que contenga el texto: " . $evento_nombre);
+        if (!$post_id) {
+            error_log("⚠️ No se encontró ningún evento con título EXACTO: {$evento_nombre}");
+            // Intento secundario: buscar parcialmente
+            $post_id = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT ID FROM $wpdb->posts 
+                     WHERE post_title LIKE %s 
+                     AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                     AND post_status = 'publish' 
+                     LIMIT 1",
+                    '%' . $wpdb->esc_like($evento_nombre) . '%'
+                )
+            );
         }
-        wp_reset_postdata();
 
-        // 3️⃣ Generar el código QR
+        if ($post_id) {
+            error_log("📌 Evento correcto encontrado: ID={$post_id}, Título=" . get_the_title($post_id));
+        } else {
+            error_log("❌ No se encontró ningún evento ni por coincidencia parcial ni exacta.");
+        }
+
+        // 🧾 Generar QR
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_persona}\nCargo: {$cargo_persona}";
-        $qrResult = Builder::create()
-            ->writer(new PngWriter())
+        $qr = \Endroid\QrCode\Builder\Builder::create()
+            ->writer(new \Endroid\QrCode\Writer\PngWriter())
             ->data($data)
             ->size(300)
             ->margin(10)
             ->build();
 
         $upload_dir = wp_upload_dir();
-        $qrPath = $upload_dir['basedir'] . '/qr_' . time() . '.png';
-        $qrResult->saveToFile($qrPath);
-        error_log("🧾 QR generado en: " . $qrPath);
+        $qr_path = $upload_dir['basedir'] . '/qr_' . time() . '.png';
+        $qr->saveToFile($qr_path);
+        error_log("🧾 QR generado en: " . $qr_path);
 
-        // 4️⃣ Crear el PDF con TCPDF
+        // 📄 Crear PDF
         $pdf = new TCPDF();
         $pdf->AddPage();
 
-        // 5️⃣ Insertar imagen del evento si existe
+        // 🖼️ Imagen del evento
         if ($post_id) {
-            $imagen_id = get_post_thumbnail_id($post_id);
-            if ($imagen_id) {
-                $imagen_url = wp_get_attachment_url($imagen_id);
-                if ($imagen_url) {
-                    $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
-                    if (file_exists($imagen_path)) {
-                        $pdf->Image($imagen_path, 15, 20, 180, 60);
-                        error_log("🖼️ Imagen del evento insertada: " . $imagen_path);
-                    } else {
-                        error_log("⚠️ La imagen destacada no se encuentra en: " . $imagen_path);
-                    }
+            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+            if ($imagen_url) {
+                $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
+                if (file_exists($imagen_path)) {
+                    $pdf->Image($imagen_path, 15, 20, 180, 60);
+                    error_log("🖼️ Imagen destacada insertada desde: " . $imagen_path);
                 } else {
-                    error_log("⚠️ wp_get_attachment_url devolvió vacío para la imagen del evento.");
+                    error_log("⚠️ No se encontró físicamente la imagen en: " . $imagen_path);
                 }
             } else {
-                error_log("⚠️ No hay imagen destacada para el evento con ID {$post_id}");
+                error_log("⚠️ El evento con ID {$post_id} no tiene imagen destacada");
             }
-        } else {
-            error_log("⚠️ No se encontró evento asociado al título recibido.");
         }
 
-        // 6️⃣ Agregar texto al PDF
         $pdf->Ln(70);
         $pdf->SetFont('helvetica', '', 14);
         $pdf->Cell(0, 10, 'Entrada para el evento', 0, 1, 'C');
@@ -112,21 +112,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 10, "Empresa: {$nombre_empresa}", 0, 1);
         $pdf->Cell(0, 10, "Nombre: {$nombre_persona}", 0, 1);
         $pdf->Cell(0, 10, "Cargo: {$cargo_persona}", 0, 1);
+        $pdf->Image($qr_path, 70, 150, 70, 70, 'PNG');
 
-        // 7️⃣ Insertar QR
-        $pdf->Image($qrPath, 70, 150, 70, 70, 'PNG');
-
-        // 8️⃣ Guardar el PDF final
         $pdf_filename = 'entrada_qr_' . time() . '.pdf';
-        $pdfPath = $upload_dir['basedir'] . '/' . $pdf_filename;
-        $pdf->Output($pdfPath, 'F');
+        $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
+        $pdf->Output($pdf_path, 'F');
+        error_log("✅ PDF generado correctamente en: " . $pdf_path);
 
-        // 9️⃣ Eliminar el QR temporal
-        if (file_exists($qrPath)) {
-            unlink($qrPath);
-        }
-
-        error_log("✅ PDF generado correctamente en: " . $pdfPath);
+        unlink($qr_path);
 
     } catch (Exception $e) {
         error_log("❌ Error al generar PDF: " . $e->getMessage());
