@@ -14,13 +14,6 @@ use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
 use TCPDF;
 
-// 🔍 Debug: detectar cualquier hook relacionado con inscripciones_qr
-add_action('all', function($hook_name) {
-    if (strpos($hook_name, 'inscripciones_qr') !== false) {
-        error_log("🎯 Se ha detectado el hook: " . $hook_name);
-    }
-});
-
 /**
  * Función principal: genera el PDF con QR + imagen del evento
  */
@@ -32,124 +25,122 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
+        
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // 📌 Título del evento desde JetFormBuilder
-        $evento_nombre = isset($request['eventos_2025'][0]) ? sanitize_text_field($request['eventos_2025'][0]) : '';
-        error_log("🔎 Nombre del evento recibido desde el formulario: " . $evento_nombre);
-
-        global $wpdb;
+        // 🔍 OBTENER EL ID DEL EVENTO desde eventos_2025
+        $post_id = null;
         
-        // 📋 PRIMERO: Listar TODOS los eventos disponibles para diagnóstico
-        error_log("📋 === LISTANDO TODOS LOS EVENTOS DISPONIBLES ===");
-        $eventos_disponibles = $wpdb->get_results(
-            "SELECT ID, post_title, post_type FROM $wpdb->posts 
-             WHERE post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos', 'post', 'page')
-             AND post_status = 'publish' 
-             ORDER BY post_date DESC
-             LIMIT 30"
-        );
-        
-        foreach ($eventos_disponibles as $evento) {
-            error_log("   🎪 ID: {$evento->ID} | Tipo: {$evento->post_type} | Título: {$evento->post_title}");
-        }
-        error_log("📋 === FIN DEL LISTADO ===");
-
-        // 🧹 Limpiar el nombre del evento
-        $evento_nombre_limpio = trim(preg_replace('/\s+/', ' ', $evento_nombre));
-        $evento_nombre_decoded = html_entity_decode($evento_nombre_limpio);
-        error_log("🧹 Nombre limpio: " . $evento_nombre_limpio);
-        error_log("🧹 Nombre decoded: " . $evento_nombre_decoded);
-
-        // 🎯 ESTRATEGIA 1: Búsqueda exacta (con y sin HTML entities)
-        $post_id = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT ID FROM $wpdb->posts 
-                 WHERE (TRIM(REPLACE(post_title, '  ', ' ')) = %s 
-                    OR TRIM(REPLACE(post_title, '  ', ' ')) = %s)
-                 AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                 AND post_status = 'publish' 
-                 LIMIT 1",
-                $evento_nombre_limpio,
-                $evento_nombre_decoded
-            )
-        );
-
-        if (!$post_id) {
-            error_log("⚠️ Intento 1 fallido. Probando búsqueda con UPPER...");
+        if (isset($request['eventos_2025'])) {
+            $eventos_data = $request['eventos_2025'];
             
-            // 🎯 ESTRATEGIA 2: Búsqueda sin distinguir mayúsculas/minúsculas
-            $post_id = $wpdb->get_var(
-                $wpdb->prepare(
+            error_log("🔎 Contenido de eventos_2025: " . print_r($eventos_data, true));
+            error_log("🔎 Tipo de dato: " . gettype($eventos_data));
+            
+            // Puede venir como array o string
+            if (is_array($eventos_data)) {
+                // Si es array, tomar el primer elemento
+                $evento_value = isset($eventos_data[0]) ? $eventos_data[0] : null;
+                error_log("🔎 Primer elemento del array: " . $evento_value);
+            } else {
+                // Si es string directamente
+                $evento_value = $eventos_data;
+                error_log("🔎 Valor directo: " . $evento_value);
+            }
+            
+            // CASO 1: Es un ID numérico
+            if (is_numeric($evento_value)) {
+                $post_id = intval($evento_value);
+                error_log("✅ Se recibió ID numérico: {$post_id}");
+            }
+            // CASO 2: Es un título - buscar el post
+            elseif (!empty($evento_value)) {
+                error_log("🔍 Se recibió título, buscando el post: {$evento_value}");
+                
+                global $wpdb;
+                $evento_titulo = sanitize_text_field($evento_value);
+                
+                // Buscar por título exacto
+                $post_id = $wpdb->get_var($wpdb->prepare(
                     "SELECT ID FROM $wpdb->posts 
-                     WHERE UPPER(TRIM(REPLACE(post_title, '  ', ' '))) = UPPER(%s)
+                     WHERE TRIM(post_title) = %s 
                      AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                      AND post_status = 'publish' 
                      LIMIT 1",
-                    $evento_nombre_limpio
-                )
-            );
-        }
-
-        if (!$post_id) {
-            error_log("⚠️ Intento 2 fallido. Probando búsqueda parcial estricta...");
-            
-            // 🎯 ESTRATEGIA 3: Extraer identificador principal del evento
-            // Ejemplo: "ECO CONSTRUYE 2025" de "ECO CONSTRUYE 2025 EDIFICACION SOSTENIBLE MADRID..."
-            preg_match('/^([A-Z\s]+\d{4})/', $evento_nombre_limpio, $matches);
-            
-            if (!empty($matches[1])) {
-                $identificador = trim($matches[1]);
-                error_log("🔑 Identificador extraído: " . $identificador);
+                    $evento_titulo
+                ));
                 
-                $post_id = $wpdb->get_var(
-                    $wpdb->prepare(
+                // Si no encuentra, buscar sin distinguir mayúsculas
+                if (!$post_id) {
+                    $post_id = $wpdb->get_var($wpdb->prepare(
                         "SELECT ID FROM $wpdb->posts 
-                         WHERE UPPER(post_title) LIKE UPPER(%s)
+                         WHERE UPPER(TRIM(post_title)) = UPPER(%s)
                          AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                          AND post_status = 'publish' 
-                         AND UPPER(post_title) LIKE UPPER(%s)
-                         ORDER BY post_date DESC
                          LIMIT 1",
-                        '%' . $wpdb->esc_like($identificador) . '%',
-                        '%MADRID%'
-                    )
-                );
-            }
-        }
-
-        if (!$post_id) {
-            error_log("⚠️ Intento 3 fallido. Probando búsqueda por fecha en título...");
-            
-            // 🎯 ESTRATEGIA 4: Buscar por fecha mencionada (26 NOVIEMBRE)
-            preg_match('/(\d{1,2})\s+(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i', $evento_nombre_limpio, $fecha_matches);
-            
-            if (!empty($fecha_matches[0])) {
-                $fecha_buscar = $fecha_matches[0];
-                error_log("📅 Fecha extraída: " . $fecha_buscar);
+                        $evento_titulo
+                    ));
+                }
                 
-                $post_id = $wpdb->get_var(
-                    $wpdb->prepare(
-                        "SELECT ID FROM $wpdb->posts 
-                         WHERE UPPER(post_title) LIKE UPPER(%s)
-                         AND UPPER(post_title) LIKE UPPER(%s)
-                         AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                         AND post_status = 'publish' 
-                         ORDER BY post_date DESC
-                         LIMIT 1",
-                        '%' . $wpdb->esc_like($fecha_buscar) . '%',
-                        '%ECO%CONSTRUYE%'
-                    )
-                );
+                // Si aún no encuentra, buscar parcialmente
+                if (!$post_id) {
+                    $palabras = explode(' ', $evento_titulo);
+                    $palabras_importantes = array_filter($palabras, function($p) {
+                        return strlen($p) > 3 && !is_numeric($p);
+                    });
+                    
+                    if (count($palabras_importantes) >= 2) {
+                        $primera = array_values($palabras_importantes)[0];
+                        $segunda = array_values($palabras_importantes)[1];
+                        
+                        error_log("🔑 Buscando con palabras clave: {$primera}, {$segunda}");
+                        
+                        $post_id = $wpdb->get_var($wpdb->prepare(
+                            "SELECT ID FROM $wpdb->posts 
+                             WHERE UPPER(post_title) LIKE UPPER(%s)
+                             AND UPPER(post_title) LIKE UPPER(%s)
+                             AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                             AND post_status = 'publish' 
+                             ORDER BY post_date DESC
+                             LIMIT 1",
+                            '%' . $wpdb->esc_like($primera) . '%',
+                            '%' . $wpdb->esc_like($segunda) . '%'
+                        ));
+                    }
+                }
             }
         }
-
+        
+        // 🎯 VERIFICAR SI ENCONTRAMOS EL EVENTO
         if ($post_id) {
-            $titulo_encontrado = get_the_title($post_id);
-            error_log("✅ EVENTO ENCONTRADO: ID={$post_id}");
-            error_log("✅ Título del post: {$titulo_encontrado}");
+            $post = get_post($post_id);
+            if ($post && $post->post_status === 'publish') {
+                error_log("✅ EVENTO ENCONTRADO:");
+                error_log("   • ID: {$post_id}");
+                error_log("   • Título: " . get_the_title($post_id));
+                error_log("   • Tipo: " . $post->post_type);
+                error_log("   • Estado: " . $post->post_status);
+            } else {
+                error_log("❌ El ID {$post_id} no corresponde a un post válido o no está publicado");
+                $post_id = null;
+            }
         } else {
-            error_log("❌ NO SE ENCONTRÓ NINGÚN EVENTO. Revisa el listado anterior.");
+            error_log("❌ No se pudo determinar el ID del evento");
+            
+            // Debug: listar eventos disponibles
+            global $wpdb;
+            $eventos = $wpdb->get_results(
+                "SELECT ID, post_title, post_type FROM $wpdb->posts 
+                 WHERE post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                 AND post_status = 'publish' 
+                 ORDER BY post_date DESC 
+                 LIMIT 20"
+            );
+            
+            error_log("📋 Eventos disponibles (últimos 20):");
+            foreach ($eventos as $evt) {
+                error_log("   • ID: {$evt->ID} | Tipo: {$evt->post_type} | {$evt->post_title}");
+            }
         }
 
         // 🧾 Generar QR
@@ -171,19 +162,26 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->AddPage();
 
         // 🖼️ Imagen del evento
+        $imagen_insertada = false;
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-            error_log("🔗 URL de imagen destacada: " . ($imagen_url ?: 'NO TIENE'));
+            error_log("🖼️ URL de imagen destacada: " . ($imagen_url ?: 'NO TIENE'));
             
             if ($imagen_url) {
                 $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
-                error_log("📂 Ruta física de la imagen: " . $imagen_path);
+                error_log("📂 Ruta física de imagen: " . $imagen_path);
+                error_log("📂 ¿Existe el archivo? " . (file_exists($imagen_path) ? 'SÍ' : 'NO'));
                 
                 if (file_exists($imagen_path)) {
-                    $pdf->Image($imagen_path, 15, 20, 180, 60);
-                    error_log("✅ Imagen insertada correctamente");
+                    try {
+                        $pdf->Image($imagen_path, 15, 20, 180, 60);
+                        $imagen_insertada = true;
+                        error_log("✅ Imagen del evento insertada correctamente");
+                    } catch (Exception $e) {
+                        error_log("❌ Error al insertar imagen: " . $e->getMessage());
+                    }
                 } else {
-                    error_log("❌ El archivo de imagen NO existe físicamente");
+                    error_log("❌ El archivo de imagen no existe físicamente");
                 }
             } else {
                 error_log("⚠️ El post no tiene imagen destacada configurada");
@@ -192,21 +190,34 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             error_log("⚠️ No se puede insertar imagen porque no se encontró el evento");
         }
 
-        $pdf->Ln(70);
-        $pdf->SetFont('helvetica', '', 14);
+        // 📝 Contenido del PDF
+        $pdf->Ln($imagen_insertada ? 70 : 20);
+        $pdf->SetFont('helvetica', 'B', 16);
         $pdf->Cell(0, 10, 'Entrada para el evento', 0, 1, 'C');
+        $pdf->Ln(5);
+        
+        if ($post_id) {
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->MultiCell(0, 10, get_the_title($post_id), 0, 'C');
+            $pdf->Ln(5);
+        }
+        
         $pdf->SetFont('helvetica', '', 12);
-        $pdf->Cell(0, 10, "Empresa: {$nombre_empresa}", 0, 1);
-        $pdf->Cell(0, 10, "Nombre: {$nombre_persona}", 0, 1);
-        $pdf->Cell(0, 10, "Cargo: {$cargo_persona}", 0, 1);
-        $pdf->Image($qr_path, 70, 150, 70, 70, 'PNG');
+        $pdf->Cell(0, 8, "Empresa: {$nombre_empresa}", 0, 1);
+        $pdf->Cell(0, 8, "Nombre: {$nombre_persona}", 0, 1);
+        $pdf->Cell(0, 8, "Cargo: {$cargo_persona}", 0, 1);
+        
+        $pdf->Ln(10);
+        $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
+        // 💾 Guardar PDF
         $pdf_filename = 'entrada_qr_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         error_log("✅ PDF generado correctamente en: " . $pdf_path);
 
-        unlink($qr_path);
+        // 🧹 Limpiar archivo temporal
+        @unlink($qr_path);
 
     } catch (Exception $e) {
         error_log("❌ Error al generar PDF: " . $e->getMessage());
@@ -214,7 +225,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     }
 }
 
-// 🚀 Hook JetFormBuilder — acción personalizada "inscripciones_qr"
+// 🚀 Hook JetFormBuilder
 add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_personalizado', 10, 3);
 
 error_log("✅ functions.php (QR personalizado) cargado correctamente");
