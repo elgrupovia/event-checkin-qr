@@ -22,36 +22,32 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     error_log("📥 Datos completos del formulario: " . print_r($request, true));
 
     try {
+        // ▪ Datos del participante
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // 🔹 Obtener ID del evento directamente
+        // ▪ Obtener ID del evento directamente del formulario
         $post_id = null;
         if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
             $post_id = intval($request['eventos_2025'][0]);
         }
 
-        // 🎯 Verificar si el post existe y está publicado
-        if ($post_id) {
-            $post = get_post($post_id);
-            if (!$post || $post->post_status !== 'publish') {
-                error_log("❌ El ID {$post_id} no corresponde a un post válido o no está publicado");
-                $post_id = null;
-            } else {
-                error_log("✅ EVENTO ENCONTRADO:");
-                error_log("   • ID: {$post_id}");
-                error_log("   • Título: " . get_the_title($post_id));
-                error_log("   • Tipo: " . $post->post_type);
-                error_log("   • Estado: " . $post->post_status);
-            }
+        // ▪ Verificar que el post exista y esté publicado
+        if (!$post_id || !($post = get_post($post_id)) || $post->post_status !== 'publish') {
+            error_log("❌ No se proporcionó ID de evento válido o el post no está publicado");
+            $post_id = null;
         } else {
-            error_log("❌ No se proporcionó ID de evento válido");
+            error_log("✅ EVENTO ENCONTRADO:");
+            error_log("   • ID: {$post_id}");
+            error_log("   • Título: " . get_the_title($post_id));
+            error_log("   • Tipo: " . $post->post_type);
+            error_log("   • Estado: " . $post->post_status);
         }
 
-        // 🧾 Generar QR
+        // ▪ Generar QR
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_persona}\nCargo: {$cargo_persona}";
         $qr = Builder::create()
             ->writer(new PngWriter())
@@ -65,21 +61,16 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr->saveToFile($qr_path);
         error_log("🧾 QR generado en: " . $qr_path);
 
-        // 📄 Crear PDF
+        // ▪ Crear PDF
         $pdf = new TCPDF();
         $pdf->AddPage();
 
-        // 🖼️ Imagen del evento
+        // ▪ Imagen del evento
         $imagen_insertada = false;
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-            error_log("🖼️ URL de imagen destacada: " . ($imagen_url ?: 'NO TIENE'));
-
             if ($imagen_url) {
                 $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
-                error_log("📂 Ruta física de imagen: " . $imagen_path);
-                error_log("📂 ¿Existe el archivo? " . (file_exists($imagen_path) ? 'SÍ' : 'NO'));
-
                 if (file_exists($imagen_path)) {
                     try {
                         $pdf->Image($imagen_path, 15, 20, 180, 60);
@@ -88,11 +79,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen: " . $e->getMessage());
                     }
+                } else {
+                    error_log("⚠️ La imagen del evento no existe físicamente: " . $imagen_path);
                 }
+            } else {
+                error_log("⚠️ El evento no tiene imagen destacada configurada");
             }
         }
 
-        // 📝 Contenido del PDF
+        // ▪ Contenido del PDF
         $pdf->Ln($imagen_insertada ? 70 : 20);
         $pdf->SetFont('helvetica', 'B', 16);
         $pdf->Cell(0, 10, 'Entrada para el evento', 0, 1, 'C');
@@ -112,13 +107,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(10);
         $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
-        // 💾 Guardar PDF
-        $pdf_filename = 'entrada_qr_' . time() . '.pdf';
+        // ▪ Guardar PDF
+        $pdf_filename = 'entrada_' . sanitize_file_name($nombre_persona) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         error_log("✅ PDF generado correctamente en: " . $pdf_path);
 
-        // 🧹 Limpiar archivo temporal
+        // ▪ Limpiar QR temporal
         @unlink($qr_path);
 
     } catch (Exception $e) {
