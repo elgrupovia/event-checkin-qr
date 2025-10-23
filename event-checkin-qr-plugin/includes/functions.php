@@ -29,22 +29,34 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // ▪ Obtener ID del evento directamente del formulario
-        $post_id = null;
-        if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
-            $post_id = intval($request['eventos_2025'][0]);
-        }
+        // ▪ Buscar evento por título y año
+        $titulo_evento = isset($request['titulo_evento']) ? sanitize_text_field($request['titulo_evento']) : '';
+        $anio_evento   = isset($request['anio_evento']) ? intval($request['anio_evento']) : 0;
 
-        // ▪ Verificar que el post exista y esté publicado
-        if (!$post_id || !($post = get_post($post_id)) || $post->post_status !== 'publish') {
-            error_log("❌ No se proporcionó ID de evento válido o el post no está publicado");
-            $post_id = null;
+        $post_id = null;
+
+        if ($titulo_evento && $anio_evento) {
+            $args = [
+                'post_type'      => 'eventos', // Cambia según tu CPT
+                'posts_per_page' => 1,
+                's'              => $titulo_evento,
+                'post_status'    => 'publish',
+                'date_query'     => [
+                    [
+                        'year' => $anio_evento,
+                    ]
+                ]
+            ];
+
+            $posts = get_posts($args);
+            if (!empty($posts)) {
+                $post_id = $posts[0]->ID;
+                error_log("✅ Evento encontrado: ID={$post_id}, Título={$posts[0]->post_title}");
+            } else {
+                error_log("❌ No se encontró ningún evento que coincida con el título '{$titulo_evento}' y año {$anio_evento}");
+            }
         } else {
-            error_log("✅ EVENTO ENCONTRADO:");
-            error_log("   • ID: {$post_id}");
-            error_log("   • Título: " . get_the_title($post_id));
-            error_log("   • Tipo: " . $post->post_type);
-            error_log("   • Estado: " . $post->post_status);
+            error_log("⚠️ Falta título o año del evento en el formulario");
         }
 
         // ▪ Generar QR
