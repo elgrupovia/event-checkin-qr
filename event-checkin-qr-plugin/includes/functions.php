@@ -38,92 +38,118 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $evento_nombre = isset($request['eventos_2025'][0]) ? sanitize_text_field($request['eventos_2025'][0]) : '';
         error_log("🔎 Nombre del evento recibido desde el formulario: " . $evento_nombre);
 
-        // 🧹 Limpiar el nombre del evento: normalizar espacios y caracteres
-        $evento_nombre_limpio = trim(preg_replace('/\s+/', ' ', $evento_nombre));
-        error_log("🧹 Nombre del evento después de limpiar: " . $evento_nombre_limpio);
-
         global $wpdb;
         
-        // 🎯 ESTRATEGIA 1: Búsqueda exacta con nombre limpio
+        // 📋 PRIMERO: Listar TODOS los eventos disponibles para diagnóstico
+        error_log("📋 === LISTANDO TODOS LOS EVENTOS DISPONIBLES ===");
+        $eventos_disponibles = $wpdb->get_results(
+            "SELECT ID, post_title, post_type FROM $wpdb->posts 
+             WHERE post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos', 'post', 'page')
+             AND post_status = 'publish' 
+             ORDER BY post_date DESC
+             LIMIT 30"
+        );
+        
+        foreach ($eventos_disponibles as $evento) {
+            error_log("   🎪 ID: {$evento->ID} | Tipo: {$evento->post_type} | Título: {$evento->post_title}");
+        }
+        error_log("📋 === FIN DEL LISTADO ===");
+
+        // 🧹 Limpiar el nombre del evento
+        $evento_nombre_limpio = trim(preg_replace('/\s+/', ' ', $evento_nombre));
+        $evento_nombre_decoded = html_entity_decode($evento_nombre_limpio);
+        error_log("🧹 Nombre limpio: " . $evento_nombre_limpio);
+        error_log("🧹 Nombre decoded: " . $evento_nombre_decoded);
+
+        // 🎯 ESTRATEGIA 1: Búsqueda exacta (con y sin HTML entities)
         $post_id = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT ID FROM $wpdb->posts 
-                 WHERE TRIM(REPLACE(post_title, '  ', ' ')) = %s 
+                 WHERE (TRIM(REPLACE(post_title, '  ', ' ')) = %s 
+                    OR TRIM(REPLACE(post_title, '  ', ' ')) = %s)
                  AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                  AND post_status = 'publish' 
                  LIMIT 1",
-                $evento_nombre_limpio
+                $evento_nombre_limpio,
+                $evento_nombre_decoded
             )
         );
 
         if (!$post_id) {
-            error_log("⚠️ Intento 1 fallido. Probando búsqueda parcial...");
+            error_log("⚠️ Intento 1 fallido. Probando búsqueda con UPPER...");
             
-            // 🎯 ESTRATEGIA 2: Búsqueda por LIKE con limpieza
+            // 🎯 ESTRATEGIA 2: Búsqueda sin distinguir mayúsculas/minúsculas
             $post_id = $wpdb->get_var(
                 $wpdb->prepare(
                     "SELECT ID FROM $wpdb->posts 
-                     WHERE TRIM(REPLACE(post_title, '  ', ' ')) LIKE %s 
+                     WHERE UPPER(TRIM(REPLACE(post_title, '  ', ' '))) = UPPER(%s)
                      AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                      AND post_status = 'publish' 
                      LIMIT 1",
-                    '%' . $wpdb->esc_like($evento_nombre_limpio) . '%'
+                    $evento_nombre_limpio
                 )
             );
         }
 
         if (!$post_id) {
-            error_log("⚠️ Intento 2 fallido. Probando búsqueda por palabras clave...");
+            error_log("⚠️ Intento 2 fallido. Probando búsqueda parcial estricta...");
             
-            // 🎯 ESTRATEGIA 3: Extraer palabras clave principales
-            $palabras_clave = explode(' ', $evento_nombre_limpio);
-            $palabras_principales = array_filter($palabras_clave, function($palabra) {
-                return strlen($palabra) > 3; // Solo palabras de más de 3 caracteres
-            });
+            // 🎯 ESTRATEGIA 3: Extraer identificador principal del evento
+            // Ejemplo: "ECO CONSTRUYE 2025" de "ECO CONSTRUYE 2025 EDIFICACION SOSTENIBLE MADRID..."
+            preg_match('/^([A-Z\s]+\d{4})/', $evento_nombre_limpio, $matches);
             
-            if (count($palabras_principales) >= 2) {
-                $primera_palabra = $palabras_principales[0];
-                $segunda_palabra = $palabras_principales[1];
-                
-                error_log("🔑 Buscando con palabras clave: {$primera_palabra} y {$segunda_palabra}");
+            if (!empty($matches[1])) {
+                $identificador = trim($matches[1]);
+                error_log("🔑 Identificador extraído: " . $identificador);
                 
                 $post_id = $wpdb->get_var(
                     $wpdb->prepare(
                         "SELECT ID FROM $wpdb->posts 
-                         WHERE post_title LIKE %s 
-                         AND post_title LIKE %s
+                         WHERE UPPER(post_title) LIKE UPPER(%s)
                          AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
                          AND post_status = 'publish' 
+                         AND UPPER(post_title) LIKE UPPER(%s)
+                         ORDER BY post_date DESC
                          LIMIT 1",
-                        '%' . $wpdb->esc_like($primera_palabra) . '%',
-                        '%' . $wpdb->esc_like($segunda_palabra) . '%'
+                        '%' . $wpdb->esc_like($identificador) . '%',
+                        '%MADRID%'
                     )
                 );
             }
         }
 
         if (!$post_id) {
-            error_log("⚠️ Intento 3 fallido. Listando todos los eventos disponibles...");
+            error_log("⚠️ Intento 3 fallido. Probando búsqueda por fecha en título...");
             
-            // 📋 Listar todos los eventos para diagnóstico
-            $eventos_disponibles = $wpdb->get_results(
-                "SELECT ID, post_title FROM $wpdb->posts 
-                 WHERE post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                 AND post_status = 'publish' 
-                 ORDER BY post_date DESC
-                 LIMIT 10"
-            );
+            // 🎯 ESTRATEGIA 4: Buscar por fecha mencionada (26 NOVIEMBRE)
+            preg_match('/(\d{1,2})\s+(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)/i', $evento_nombre_limpio, $fecha_matches);
             
-            error_log("📋 Eventos disponibles en la base de datos:");
-            foreach ($eventos_disponibles as $evento) {
-                error_log("   - ID: {$evento->ID} | Título: {$evento->post_title}");
+            if (!empty($fecha_matches[0])) {
+                $fecha_buscar = $fecha_matches[0];
+                error_log("📅 Fecha extraída: " . $fecha_buscar);
+                
+                $post_id = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT ID FROM $wpdb->posts 
+                         WHERE UPPER(post_title) LIKE UPPER(%s)
+                         AND UPPER(post_title) LIKE UPPER(%s)
+                         AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
+                         AND post_status = 'publish' 
+                         ORDER BY post_date DESC
+                         LIMIT 1",
+                        '%' . $wpdb->esc_like($fecha_buscar) . '%',
+                        '%ECO%CONSTRUYE%'
+                    )
+                );
             }
         }
 
         if ($post_id) {
-            error_log("✅ Evento encontrado: ID={$post_id}, Título=" . get_the_title($post_id));
+            $titulo_encontrado = get_the_title($post_id);
+            error_log("✅ EVENTO ENCONTRADO: ID={$post_id}");
+            error_log("✅ Título del post: {$titulo_encontrado}");
         } else {
-            error_log("❌ No se encontró ningún evento después de 3 intentos. Continuando sin imagen.");
+            error_log("❌ NO SE ENCONTRÓ NINGÚN EVENTO. Revisa el listado anterior.");
         }
 
         // 🧾 Generar QR
@@ -147,17 +173,23 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // 🖼️ Imagen del evento
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+            error_log("🔗 URL de imagen destacada: " . ($imagen_url ?: 'NO TIENE'));
+            
             if ($imagen_url) {
                 $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
+                error_log("📂 Ruta física de la imagen: " . $imagen_path);
+                
                 if (file_exists($imagen_path)) {
                     $pdf->Image($imagen_path, 15, 20, 180, 60);
-                    error_log("🖼️ Imagen destacada insertada desde: " . $imagen_path);
+                    error_log("✅ Imagen insertada correctamente");
                 } else {
-                    error_log("⚠️ No se encontró físicamente la imagen en: " . $imagen_path);
+                    error_log("❌ El archivo de imagen NO existe físicamente");
                 }
             } else {
-                error_log("⚠️ El evento con ID {$post_id} no tiene imagen destacada");
+                error_log("⚠️ El post no tiene imagen destacada configurada");
             }
+        } else {
+            error_log("⚠️ No se puede insertar imagen porque no se encontró el evento");
         }
 
         $pdf->Ln(70);
@@ -178,6 +210,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
     } catch (Exception $e) {
         error_log("❌ Error al generar PDF: " . $e->getMessage());
+        error_log("❌ Stack trace: " . $e->getTraceAsString());
     }
 }
 
