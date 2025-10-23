@@ -28,94 +28,27 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // 🔍 OBTENER EL ID DEL EVENTO desde eventos_2025
+        // 🔹 Obtener ID del evento directamente
         $post_id = null;
-
-        if (isset($request['eventos_2025'])) {
-            $eventos_data = $request['eventos_2025'];
-            $evento_value = is_array($eventos_data) ? ($eventos_data[0] ?? null) : $eventos_data;
-
-            error_log("🔎 Contenido de eventos_2025: " . print_r($eventos_data, true));
-            error_log("🔎 Valor procesado: " . $evento_value);
-
-            if (is_numeric($evento_value)) {
-                // Si el formulario ya devuelve ID
-                $post_id = intval($evento_value);
-                error_log("✅ Se recibió ID numérico: {$post_id}");
-            } elseif (!empty($evento_value)) {
-                // Si devuelve título, buscar post
-                global $wpdb;
-                $evento_titulo = sanitize_text_field($evento_value);
-                error_log("🔍 Buscando post por título: {$evento_titulo}");
-
-                // 1️⃣ Coincidencia exacta (sin importar mayúsculas/minúsculas o guiones)
-                $post_id = $wpdb->get_var($wpdb->prepare(
-                    "SELECT ID FROM $wpdb->posts 
-                     WHERE REPLACE(LOWER(TRIM(post_title)), '–', '-') = REPLACE(LOWER(TRIM(%s)), '–', '-')
-                     AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                     AND post_status = 'publish' 
-                     LIMIT 1",
-                    $evento_titulo
-                ));
-
-                // 2️⃣ Coincidencia parcial inicial (primeras 3 palabras importantes)
-                if (!$post_id) {
-                    $palabras = explode(' ', $evento_titulo);
-                    $palabras_filtradas = array_filter($palabras, function($p) { return strlen($p) > 4 && !is_numeric($p); });
-
-                    if (count($palabras_filtradas) >= 3) {
-                        $like = '%' . $wpdb->esc_like(implode(' ', array_slice($palabras_filtradas, 0, 3))) . '%';
-                        error_log("🔑 Búsqueda parcial (frase inicial): {$like}");
-                        $post_id = $wpdb->get_var($wpdb->prepare(
-                            "SELECT ID FROM $wpdb->posts 
-                             WHERE LOWER(post_title) LIKE LOWER(%s)
-                             AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                             AND post_status = 'publish'
-                             ORDER BY post_date DESC
-                             LIMIT 1",
-                            $like
-                        ));
-                    }
-                }
-
-                // 3️⃣ Último recurso: búsqueda por palabras clave
-                if (!$post_id) {
-                    $palabras_importantes = array_filter($palabras, function($p) { return strlen($p) > 3 && !is_numeric($p); });
-                    if (count($palabras_importantes) >= 2) {
-                        $primera = array_values($palabras_importantes)[0];
-                        $segunda = array_values($palabras_importantes)[1];
-                        error_log("🔑 Último intento (palabras clave): {$primera}, {$segunda}");
-                        $post_id = $wpdb->get_var($wpdb->prepare(
-                            "SELECT ID FROM $wpdb->posts 
-                             WHERE LOWER(post_title) LIKE LOWER(%s)
-                             AND LOWER(post_title) LIKE LOWER(%s)
-                             AND post_type IN ('evento', 'eventos', 'via_evento', 'via_eventos')
-                             AND post_status = 'publish'
-                             ORDER BY post_date DESC
-                             LIMIT 1",
-                            '%' . $wpdb->esc_like($primera) . '%',
-                            '%' . $wpdb->esc_like($segunda) . '%'
-                        ));
-                    }
-                }
-            }
+        if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
+            $post_id = intval($request['eventos_2025'][0]);
         }
 
-        // 🎯 VERIFICAR SI ENCONTRAMOS EL EVENTO
+        // 🎯 Verificar si el post existe y está publicado
         if ($post_id) {
             $post = get_post($post_id);
-            if ($post && $post->post_status === 'publish') {
+            if (!$post || $post->post_status !== 'publish') {
+                error_log("❌ El ID {$post_id} no corresponde a un post válido o no está publicado");
+                $post_id = null;
+            } else {
                 error_log("✅ EVENTO ENCONTRADO:");
                 error_log("   • ID: {$post_id}");
                 error_log("   • Título: " . get_the_title($post_id));
                 error_log("   • Tipo: " . $post->post_type);
                 error_log("   • Estado: " . $post->post_status);
-            } else {
-                error_log("❌ El ID {$post_id} no corresponde a un post válido o no está publicado");
-                $post_id = null;
             }
         } else {
-            error_log("❌ No se pudo determinar el ID del evento");
+            error_log("❌ No se proporcionó ID de evento válido");
         }
 
         // 🧾 Generar QR
