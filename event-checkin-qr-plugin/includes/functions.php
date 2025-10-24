@@ -47,7 +47,7 @@ function buscar_evento_robusto($titulo_buscado) {
     // Obtener TODOS los eventos publicados
     $args = [
         'post_type'      => 'eventos', 
-        'category'       => '2025',
+        //'category'       => '2025',
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
@@ -55,7 +55,7 @@ function buscar_evento_robusto($titulo_buscado) {
     ];
     
     $eventos = get_posts($args);
-    
+    error.log((var_dump($eventos)));
     if (empty($eventos)) {
         error_log("⚠️ No se encontraron eventos con post_type='eventos'");
         error_log("🔍 Verificando otros post types disponibles...");
@@ -88,7 +88,7 @@ function buscar_evento_robusto($titulo_buscado) {
             error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
             return $evento->ID;
         }
-    
+        
         
     }
     
