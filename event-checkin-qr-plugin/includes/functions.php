@@ -1,8 +1,8 @@
 <?php
 /**
  * functions.php — Plugin Event Check-In QR
- * Genera un PDF con código QR personalizado
- * ✅ VERSIÓN SIMPLIFICADA: Solo búsqueda EXACTA (sin fuzzy matching)
+ * Genera un PDF con código QR personalizado al ejecutar el hook JetFormBuilder "inscripciones_qr"
+ * ✅ Búsqueda mejorada con normalización de texto y múltiples estrategias
  */
 
 if (!defined('ABSPATH')) {
@@ -16,106 +16,146 @@ use Endroid\QrCode\Writer\PngWriter;
 use TCPDF;
 
 /**
- * Normaliza texto para comparación exacta
+ * Normaliza texto para comparación (quita acentos, convierte a minúsculas, normaliza espacios)
  */
-function normalizar_texto_exacto($texto) {
-    // Decodificar entidades HTML
-    $texto = html_entity_decode($texto, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    
+function normalizar_texto($texto) {
     // Convertir a minúsculas
     $texto = mb_strtolower($texto, 'UTF-8');
     
-    // Normalizar espacios
+    // Quitar acentos y caracteres especiales
+    $texto = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
+    
+    // Normalizar espacios múltiples y trim
     $texto = preg_replace('/\s+/', ' ', trim($texto));
     
-    // Reemplazar caracteres especiales comunes
-    $texto = str_replace(['&amp;', '&'], 'y', $texto);
-    $texto = str_replace(['–', '—', '-'], ' ', $texto);
-    
-    // Quitar puntuación al final
-    $texto = rtrim($texto, '.,;:!?');
+    // Quitar caracteres especiales excepto espacios y guiones
+    $texto = preg_replace('/[^a-z0-9\s\-]/', '', $texto);
     
     return $texto;
 }
 
 /**
- * Busca el evento SOLO por coincidencia EXACTA
+ * Busca el evento usando múltiples estrategias
  */
-function buscar_evento_exacto($titulo_buscado) {
-    error_log("🔍 === BÚSQUEDA EXACTA DE EVENTO ===");
-    error_log("📝 Título buscado: '{$titulo_buscado}'");
+function buscar_evento_robusto($titulo_buscado) {
+    error_log("🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO ===");
+    error_log("📝 Título recibido del formulario: '{$titulo_buscado}'");
     
-    $titulo_normalizado = normalizar_texto_exacto($titulo_buscado);
-    error_log("🔤 Normalizado: '{$titulo_normalizado}'");
+    $titulo_normalizado = normalizar_texto($titulo_buscado);
+    error_log("🔤 Título normalizado: '{$titulo_normalizado}'");
     
-    // Obtener todos los eventos
-    $eventos = get_posts([
-        'post_type'      => 'eventos',
+    // Obtener TODOS los eventos publicados
+    $args = [
+        'post_type'      => 'eventos', // ✅ CORREGIDO: era 'eventos_2025'
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
         'order'          => 'DESC'
-    ]);
+    ];
+    
+    $eventos = get_posts($args);
     
     if (empty($eventos)) {
-        error_log("❌ No se encontraron eventos publicados");
+        error_log("⚠️ No se encontraron eventos con post_type='eventos'");
+        error_log("🔍 Verificando otros post types disponibles...");
+        
+        // Listar todos los post types registrados
+        $post_types = get_post_types(['public' => true], 'names');
+        error_log("📋 Post types disponibles: " . implode(', ', $post_types));
+        
         return null;
     }
     
-    error_log("📊 Total eventos disponibles: " . count($eventos));
-    error_log("🔎 Buscando coincidencia EXACTA...");
-    
-    $candidatos = [];
+    error_log("✅ Se encontraron " . count($eventos) . " eventos publicados");
+    error_log("📋 Lista de eventos disponibles:");
     
     foreach ($eventos as $evento) {
         $titulo_evento = get_the_title($evento->ID);
-        $titulo_evento_normalizado = normalizar_texto_exacto($titulo_evento);
+        $titulo_evento_normalizado = normalizar_texto($titulo_evento);
         
-        // SOLO coincidencia EXACTA
+        error_log("   • ID: {$evento->ID} | Título: '{$titulo_evento}'");
+        error_log("     Normalizado: '{$titulo_evento_normalizado}'");
+        
+        // ESTRATEGIA 1: Comparación exacta normalizada
         if ($titulo_normalizado === $titulo_evento_normalizado) {
-            error_log("✅ ¡COINCIDENCIA EXACTA ENCONTRADA!");
-            error_log("   ID: {$evento->ID}");
-            error_log("   Título original: '{$titulo_evento}'");
+            error_log("✅ ¡COINCIDENCIA EXACTA! (normalizada) - ID: {$evento->ID}");
             return $evento->ID;
         }
         
-        // Guardar candidatos para debugging (solo primeros 5)
-        if (count($candidatos) < 5 && 
-            (strpos($titulo_evento_normalizado, 'arquitectura') !== false || 
-             strpos($titulo_evento_normalizado, 'barcelona') !== false)) {
-            $candidatos[] = [
-                'id' => $evento->ID,
-                'titulo' => $titulo_evento,
-                'normalizado' => $titulo_evento_normalizado
-            ];
+        // ESTRATEGIA 2: Comparación exacta sin normalizar
+        if (strcasecmp(trim($titulo_buscado), trim($titulo_evento)) === 0) {
+            error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
+            return $evento->ID;
+        }
+        
+        // ESTRATEGIA 3: Contiene el título (parcial)
+        if (strpos($titulo_evento_normalizado, $titulo_normalizado) !== false) {
+            error_log("⚠️ Coincidencia PARCIAL encontrada - ID: {$evento->ID}");
+            error_log("   El título del post CONTIENE el texto buscado");
         }
     }
     
-    // Si no hay coincidencia exacta, mostrar candidatos para debug
-    error_log("❌ No se encontró coincidencia exacta");
+    error_log("🔎 Intentando búsqueda por palabras clave...");
     
-    if (!empty($candidatos)) {
-        error_log("📋 Eventos similares encontrados (para debugging):");
-        foreach ($candidatos as $candidato) {
-            error_log("   • ID: {$candidato['id']}");
-            error_log("     Original: '{$candidato['titulo']}'");
-            error_log("     Normalizado: '{$candidato['normalizado']}'");
+    // ESTRATEGIA 4: Búsqueda por palabras clave principales
+    $palabras_clave = array_filter(explode(' ', $titulo_normalizado), function($palabra) {
+        return strlen($palabra) > 3; // Solo palabras de más de 3 caracteres
+    });
+    
+    if (!empty($palabras_clave)) {
+        error_log("🔑 Palabras clave extraídas: " . implode(', ', $palabras_clave));
+        
+        $mejores_coincidencias = [];
+        
+        foreach ($eventos as $evento) {
+            $titulo_evento_normalizado = normalizar_texto(get_the_title($evento->ID));
+            $coincidencias = 0;
             
-            // Comparar carácter por carácter
-            $diff = strcmp($titulo_normalizado, $candidato['normalizado']);
-            if ($diff !== 0) {
-                error_log("     ⚠️ Diferencia detectada. Comparando:");
-                error_log("       Buscado:    '{$titulo_normalizado}'");
-                error_log("       Candidato:  '{$candidato['normalizado']}'");
-                
-                // Mostrar longitudes
-                error_log("       Longitud buscado: " . strlen($titulo_normalizado));
-                error_log("       Longitud candidato: " . strlen($candidato['normalizado']));
+            foreach ($palabras_clave as $palabra) {
+                if (strpos($titulo_evento_normalizado, $palabra) !== false) {
+                    $coincidencias++;
+                }
+            }
+            
+            if ($coincidencias > 0) {
+                $mejores_coincidencias[$evento->ID] = $coincidencias;
+            }
+        }
+        
+        if (!empty($mejores_coincidencias)) {
+            arsort($mejores_coincidencias);
+            $mejor_id = array_key_first($mejores_coincidencias);
+            $mejor_puntuacion = $mejores_coincidencias[$mejor_id];
+            
+            error_log("🎯 Mejor coincidencia por palabras clave:");
+            error_log("   ID: {$mejor_id} | Puntuación: {$mejor_puntuacion}/{" . count($palabras_clave) . "}");
+            error_log("   Título: '" . get_the_title($mejor_id) . "'");
+            
+            // Solo devolver si tiene al menos 50% de coincidencia
+            if ($mejor_puntuacion >= (count($palabras_clave) * 0.5)) {
+                error_log("✅ Coincidencia suficiente (≥50%). Usando este evento.");
+                return $mejor_id;
+            } else {
+                error_log("⚠️ Coincidencia insuficiente (<50%). No se usará.");
             }
         }
     }
     
-    error_log("🔍 === FIN BÚSQUEDA ===");
+    // ESTRATEGIA 5: Búsqueda por slug
+    error_log("🔎 Intentando búsqueda por slug...");
+    $slug_buscado = sanitize_title($titulo_buscado);
+    error_log("🔗 Slug generado: '{$slug_buscado}'");
+    
+    foreach ($eventos as $evento) {
+        if ($evento->post_name === $slug_buscado) {
+            error_log("✅ ¡COINCIDENCIA POR SLUG! - ID: {$evento->ID}");
+            return $evento->ID;
+        }
+    }
+    
+    error_log("❌ No se encontró ninguna coincidencia válida");
+    error_log("🔍 === FIN BÚSQUEDA ROBUSTA ===");
+    
     return null;
 }
 
@@ -123,8 +163,8 @@ function buscar_evento_exacto($titulo_buscado) {
  * Función principal: genera el PDF con QR + imagen del evento
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
-    error_log("🚀 [inscripciones_qr] Hook ejecutado - " . date('Y-m-d H:i:s'));
-    error_log("📥 Datos del formulario: " . print_r($request, true));
+    error_log("🚀 [inscripciones_qr] Hook ejecutado");
+    error_log("📥 Datos completos del formulario: " . print_r($request, true));
 
     try {
         // Datos del participante
@@ -132,37 +172,35 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
-        error_log("👤 Participante: {$nombre_persona} | {$cargo_persona} | {$nombre_empresa}");
+        error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // Obtener nombre del evento
+        // Obtener nombre del evento desde el formulario
         $titulo_evento_formulario = '';
         if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
-            $titulo_evento_formulario = trim($request['eventos_2025'][0]);
+            $titulo_evento_formulario = trim(sanitize_text_field($request['eventos_2025'][0]));
         }
 
         $post_id = null;
         $titulo_evento_encontrado = $titulo_evento_formulario;
 
         if ($titulo_evento_formulario) {
-            // 🎯 BÚSQUEDA SOLO EXACTA
-            $post_id = buscar_evento_exacto($titulo_evento_formulario);
+            // 🚀 BÚSQUEDA ROBUSTA CON DEPURACIÓN COMPLETA
+            $post_id = buscar_evento_robusto($titulo_evento_formulario);
             
             if ($post_id) {
-                $titulo_evento_encontrado = get_the_title($post_id);
-                error_log("✅ EVENTO ENCONTRADO: ID={$post_id}");
-                error_log("✅ Título: '{$titulo_evento_encontrado}'");
+                $titulo_evento_encontrado = trim(get_the_title($post_id));
+                error_log("✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
             } else {
-                error_log("❌ NO SE ENCONTRÓ EL EVENTO");
-                error_log("⚠️ SOLUCIÓN: Verifica que el título del evento en WordPress sea EXACTAMENTE:");
-                error_log("   '{$titulo_evento_formulario}'");
+                error_log("❌ No se pudo encontrar el evento. La imagen NO se insertará.");
             }
         } else {
-            error_log("⚠️ Campo eventos_2025 vacío");
+            error_log("⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
         }
         
         $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
 
-        // --- GENERACIÓN DE QR ---
+        // --- GENERACIÓN DE PDF Y QR (sin cambios) ---
+        
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_persona}\nCargo: {$cargo_persona}";
         $qr = Builder::create()
             ->writer(new PngWriter())
@@ -174,15 +212,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $upload_dir = wp_upload_dir();
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
-        error_log("🧾 QR generado: " . basename($qr_path));
+        error_log("🧾 QR generado en: " . $qr_path);
 
-        // --- CREAR PDF ---
         $pdf = new TCPDF();
         $pdf->AddPage();
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
-        // Imagen del evento
+        // Imagen del evento (si se encontró)
         $imagen_insertada = false;
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -190,17 +227,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $imagen_path = '';
                 $imagen_id = get_post_thumbnail_id($post_id);
                 $imagen_meta = wp_get_attachment_metadata($imagen_id);
-                
-                if ($imagen_meta && isset($imagen_meta['file'])) {
+                if ($imagen_meta) {
                    $imagen_path = $upload_dir['basedir'] . '/' . $imagen_meta['file'];
                 }
                 
                 $tmp = null;
 
-                if (!file_exists($imagen_path) && function_exists('download_url')) {
-                    $tmp = download_url($imagen_url);
-                    if (!is_wp_error($tmp)) {
-                        $imagen_path = $tmp;
+                if (!file_exists($imagen_path)) {
+                    if (function_exists('download_url')) {
+                        $tmp = download_url($imagen_url);
+                        if (!is_wp_error($tmp)) {
+                            $imagen_path = $tmp;
+                        }
                     }
                 }
 
@@ -208,17 +246,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     try {
                         $pdf->Image($imagen_path, 15, 20, 180, 60);
                         $imagen_insertada = true;
-                        error_log("✅ Imagen insertada en PDF");
+                        error_log("✅ Imagen destacada insertada correctamente");
                     } catch (Exception $e) {
-                        error_log("❌ Error al insertar imagen: " . $e->getMessage());
+                        error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
                     }
+                } else {
+                    error_log("⚠️ La imagen destacada no se pudo localizar físicamente");
                 }
                 
                 if ($tmp && !is_wp_error($tmp) && file_exists($tmp)) {
                     @unlink($tmp);
                 }
             } else {
-                error_log("⚠️ Evento sin imagen destacada");
+                error_log("⚠️ El evento ID={$post_id} no tiene imagen destacada");
             }
         }
         
@@ -244,16 +284,16 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf_filename = 'entrada_' . sanitize_file_name($nombre_persona) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
-        error_log("✅ PDF generado: {$pdf_filename}");
+        error_log("✅ PDF generado correctamente en: " . $pdf_path);
 
         @unlink($qr_path);
 
     } catch (Exception $e) {
-        error_log("❌ ERROR CRÍTICO: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+        error_log("❌ Error al generar PDF: " . $e->getMessage());
+        error_log("❌ Stack trace: " . $e->getTraceAsString());
     }
 }
 
 add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_personalizado', 10, 3);
 
-error_log("✅ Plugin QR cargado - Versión: Búsqueda Exacta - " . date('Y-m-d H:i:s'));
+error_log("✅ functions.php (QR personalizado con búsqueda mejorada) cargado correctamente");
