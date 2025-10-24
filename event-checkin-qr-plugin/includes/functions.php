@@ -2,6 +2,7 @@
 /**
  * functions.php — Plugin Event Check-In QR
  * Genera un PDF con código QR personalizado al ejecutar el hook JetFormBuilder "inscripciones_qr"
+ * * ✅ Implementada lógica de búsqueda de eventos más robusta (exacta + similitud)
  */
 
 if (!defined('ABSPATH')) {
@@ -9,6 +10,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Asegúrate de que los archivos de librerías se carguen correctamente
+// Cambia la ruta si tu estructura es diferente.
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Endroid\QrCode\Builder\Builder;
@@ -37,49 +39,70 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             $titulo_evento_formulario = trim(sanitize_text_field($request['eventos_2025'][0]));
         }
 
-        error_log("🔍 Buscando evento con título exacto '{$titulo_evento_formulario}' dentro del post type 'eventos_2025'");
+        error_log("🔍 Iniciando búsqueda del evento: '{$titulo_evento_formulario}'");
 
         $post_id = null;
-        $titulo_evento_encontrado = $titulo_evento_formulario; // Usar el título del formulario por defecto
+        $titulo_evento_encontrado = $titulo_evento_formulario; 
 
         if ($titulo_evento_formulario) {
-            // Buscar evento por título exacto en el CPT "eventos_2025"
-            // Se realiza una consulta a la base de datos para obtener todos los IDs del CPT
-            $eventos = get_posts([
+            
+            // 🚀 LÓGICA DE BÚSQUEDA ROBUSTA (Triple Intento)
+            
+            // 1. Búsqueda Exacta y Exhaustiva (Iterando posts)
+            error_log("🔎 Intento 1: Búsqueda Exacta Exhaustiva...");
+            
+            $todos_los_eventos = get_posts([
                 'post_type'      => 'eventos_2025',
                 'post_status'    => 'publish',
                 'posts_per_page' => -1,
                 'fields'         => 'ids',
             ]);
-
-            // ▪ Búsqueda Exhaustiva y Exacta: Recorre todos los posts de 'eventos_2025'
-            foreach ($eventos as $id_evento) {
+            
+            foreach ($todos_los_eventos as $id_evento) {
                 $titulo_post = trim(get_the_title($id_evento));
-                
-                // Comparación de cadenas sin distinción entre mayúsculas y minúsculas
+                // strcasecmp = comparación de cadenas sin distinción de mayúsculas/minúsculas
                 if (strcasecmp($titulo_post, $titulo_evento_formulario) === 0) {
                     $post_id = $id_evento;
-                    $titulo_evento_encontrado = $titulo_post; // Usamos el título del post encontrado
-                    error_log("✅ Coincidencia exacta encontrada: ID={$post_id}, Título={$titulo_post}");
                     break;
                 }
             }
 
+            // 2. Búsqueda por Similitud (Fuzzy Search) si el Intento 1 falla
             if (!$post_id) {
-                // Si la búsqueda exacta falla, puedes implementar aquí una lógica de "búsqueda parcial"
-                // usando 's' => $titulo_evento_formulario en get_posts y luego refinando.
-                // Sin embargo, para títulos de JetFormBuilder, la coincidencia exacta es la esperada.
-                error_log("❌ NO se encontró NINGÚN evento con el título exacto '{$titulo_evento_formulario}' en 'eventos_2025'. Revise el título del post.");
+                error_log("❌ Intento 1 falló. 🔎 Intento 2: Búsqueda por Similitud...");
+
+                $eventos_similares = get_posts([
+                    'post_type'      => 'eventos_2025',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => 1, 
+                    'fields'         => 'ids',
+                    's'              => $titulo_evento_formulario, // Búsqueda nativa de WP (más flexible)
+                    'orderby'        => 'relevance',
+                ]);
+                
+                if (!empty($eventos_similares)) {
+                    $post_id = $eventos_similares[0];
+                }
             }
+
+            // ▪ Resultado Final de la Búsqueda
+            if ($post_id) {
+                // Si encontramos un ID, obtenemos el título real de la publicación
+                $titulo_evento_encontrado = trim(get_the_title($post_id));
+                error_log("✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
+            } else {
+                error_log("❌ La búsqueda fue infructuosa. La imagen NO se insertará.");
+            }
+            
         } else {
             error_log("⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
         }
         
-        // El título a mostrar en el PDF será el del post si se encontró, o el del formulario/default si no.
+        // El título a mostrar en el PDF
         $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
 
 
-        // --- RESTO DE LA LÓGICA DE GENERACIÓN DE PDF ---
+        // --- LÓGICA DE GENERACIÓN DE PDF Y QR ---
 
         // ▪ Generar QR
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_persona}\nCargo: {$cargo_persona}";
@@ -91,7 +114,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             ->build();
 
         $upload_dir = wp_upload_dir();
-        // Usamos un nombre más simple y seguro para el QR temporal
+        // Usamos un nombre único para el QR temporal
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png'; 
         $qr->saveToFile($qr_path);
         error_log("🧾 QR generado en: " . $qr_path);
@@ -100,7 +123,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF();
         $pdf->AddPage();
         
-        // Configuración básica (si quieres evitar warnings)
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
@@ -109,39 +131,46 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
-                // Intenta obtener la ruta local de la imagen
+                
+                // Intenta obtener la ruta local
+                $imagen_path = '';
                 $imagen_id = get_post_thumbnail_id($post_id);
                 $imagen_meta = wp_get_attachment_metadata($imagen_id);
-                $imagen_path = $upload_dir['basedir'] . '/' . $imagen_meta['file'];
+                if ($imagen_meta) {
+                   $imagen_path = $upload_dir['basedir'] . '/' . $imagen_meta['file'];
+                }
                 
+                $tmp = null; // Variable para la ruta temporal si se descarga
+
                 if (!file_exists($imagen_path)) {
-                    // Si no existe localmente o la ruta es incorrecta (p. ej. imagen externa o ruta compleja)
-                    // Intenta descargar la URL como respaldo, si tienes la función download_url
+                    // Si no existe localmente, intentar descargarla
                     if (function_exists('download_url')) {
                         $tmp = download_url($imagen_url);
                         if (!is_wp_error($tmp)) {
                             $imagen_path = $tmp;
                         }
+                    } else {
+                        error_log("⚠️ Función 'download_url' no disponible. No se puede intentar descargar la imagen.");
                     }
                 }
 
                 if (file_exists($imagen_path)) {
                     try {
                         // Insertar imagen: x, y, ancho, alto
-                        // Ajusta las dimensiones según tu diseño (180mm ancho, 60mm alto es un ejemplo)
                         $pdf->Image($imagen_path, 15, 20, 180, 60); 
                         $imagen_insertada = true;
-                        error_log("✅ Imagen destacada insertada correctamente: " . $imagen_path);
+                        error_log("✅ Imagen destacada insertada correctamente");
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen en PDF (TCPDF): " . $e->getMessage());
                     }
                 } else {
-                    error_log("⚠️ La imagen destacada no se pudo localizar físicamente en: " . $imagen_path . " (URL: " . $imagen_url . ")");
+                    error_log("⚠️ La imagen destacada no se pudo localizar físicamente");
                 }
                 
                 // Limpiar archivo temporal si se descargó
-                if (isset($tmp) && !is_wp_error($tmp) && $imagen_path === $tmp) {
+                if ($tmp && !is_wp_error($tmp) && file_exists($tmp)) {
                     @unlink($tmp);
+                    error_log("🗑️ Archivo temporal de imagen descargada limpiado.");
                 }
             } else {
                 error_log("⚠️ El evento ID={$post_id} no tiene imagen destacada");
@@ -165,7 +194,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 8, "Cargo: {$cargo_persona}", 0, 1);
 
         $pdf->Ln(10);
-        // Coordenadas QR: centrado (70mm) y debajo del texto
+        // Coordenadas QR: centrado (70mm)
         $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
         // ▪ Guardar PDF
