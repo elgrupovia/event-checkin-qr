@@ -46,7 +46,8 @@ function buscar_evento_robusto($titulo_buscado) {
     
     // Obtener TODOS los eventos publicados
     $args = [
-        'post_type'      => 'eventos', // ✅ CORREGIDO: era 'eventos_2025'
+        'post_type'      => 'eventos', 
+        'category'       => '2025',
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
@@ -87,12 +88,8 @@ function buscar_evento_robusto($titulo_buscado) {
             error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
             return $evento->ID;
         }
+    
         
-        // ESTRATEGIA 3: Contiene el título (parcial)
-        if (strpos($titulo_evento_normalizado, $titulo_normalizado) !== false) {
-            error_log("⚠️ Coincidencia PARCIAL encontrada - ID: {$evento->ID}");
-            error_log("   El título del post CONTIENE el texto buscado");
-        }
     }
     
     error_log("🔎 Intentando búsqueda por palabras clave...");
