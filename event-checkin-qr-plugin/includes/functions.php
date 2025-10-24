@@ -29,34 +29,42 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
-        // ▪ Buscar evento por título y año
+        // ▪ Buscar evento dinámicamente por su título dentro de 'eventos_2025'
         $titulo_evento = isset($request['titulo_evento']) ? sanitize_text_field($request['titulo_evento']) : '';
-        $anio_evento   = isset($request['anio_evento']) ? intval($request['anio_evento']) : 0;
-
         $post_id = null;
 
-        if ($titulo_evento && $anio_evento) {
+        if ($titulo_evento) {
+            error_log("🔍 Buscando evento con título exacto: '{$titulo_evento}' dentro del post type 'eventos_2025'");
+
+            // Búsqueda exacta (no parcial) por título
             $args = [
-                'post_type'      => 'eventos', // Cambia según tu CPT
-                'posts_per_page' => 1,
-                's'              => $titulo_evento,
+                'post_type'      => 'eventos_2025', // CPT del año 2025
                 'post_status'    => 'publish',
-                'date_query'     => [
-                    [
-                        'year' => $anio_evento,
-                    ]
-                ]
+                'posts_per_page' => 1,
+                'title'          => $titulo_evento, // búsqueda exacta personalizada
             ];
 
-            $posts = get_posts($args);
-            if (!empty($posts)) {
-                $post_id = $posts[0]->ID;
-                error_log("✅ Evento encontrado: ID={$post_id}, Título={$posts[0]->post_title}");
+            // get_posts no soporta 'title' directamente, así que hacemos filtro exacto manual
+            $eventos = get_posts([
+                'post_type'      => 'eventos_2025',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+            ]);
+
+            foreach ($eventos as $evento) {
+                if (strcasecmp(trim($evento->post_title), trim($titulo_evento)) === 0) {
+                    $post_id = $evento->ID;
+                    break;
+                }
+            }
+
+            if ($post_id) {
+                error_log("✅ Evento encontrado: ID={$post_id}, Título=" . get_the_title($post_id));
             } else {
-                error_log("❌ No se encontró ningún evento que coincida con el título '{$titulo_evento}' y año {$anio_evento}");
+                error_log("❌ No se encontró ningún evento con el título exacto '{$titulo_evento}' en 'eventos_2025'");
             }
         } else {
-            error_log("⚠️ Falta título o año del evento en el formulario");
+            error_log("⚠️ No se recibió un título de evento en el formulario");
         }
 
         // ▪ Generar QR
@@ -77,12 +85,17 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF();
         $pdf->AddPage();
 
-        // ▪ Imagen del evento
+        // ▪ Imagen del evento (si se encontró)
         $imagen_insertada = false;
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $imagen_url);
+                if (!file_exists($imagen_path)) {
+                    // A veces WordPress guarda imágenes fuera de uploads/baseurl
+                    $imagen_path = download_url($imagen_url);
+                }
+
                 if (file_exists($imagen_path)) {
                     try {
                         $pdf->Image($imagen_path, 15, 20, 180, 60);
@@ -92,7 +105,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                         error_log("❌ Error al insertar imagen: " . $e->getMessage());
                     }
                 } else {
-                    error_log("⚠️ La imagen del evento no existe físicamente: " . $imagen_path);
+                    error_log("⚠️ La imagen del evento no se pudo localizar físicamente");
                 }
             } else {
                 error_log("⚠️ El evento no tiene imagen destacada configurada");
@@ -108,6 +121,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         if ($post_id) {
             $pdf->SetFont('helvetica', 'B', 14);
             $pdf->MultiCell(0, 10, get_the_title($post_id), 0, 'C');
+            $pdf->Ln(5);
+        } else {
+            $pdf->SetFont('helvetica', 'B', 14);
+            $pdf->MultiCell(0, 10, $titulo_evento ?: 'Evento no identificado', 0, 'C');
             $pdf->Ln(5);
         }
 
