@@ -67,31 +67,37 @@ function buscar_evento_robusto($titulo_buscado) {
     }
     
     error_log("✅ Se encontraron " . count($eventos) . " eventos publicados");
-    error_log("📋 Lista de eventos disponibles:");
+    
+    $coincidencias_exactas = [];
+    $coincidencias_parciales = [];
     
     foreach ($eventos as $evento) {
         $titulo_evento = get_the_title($evento->ID);
         $titulo_evento_normalizado = normalizar_texto($titulo_evento);
         
-        error_log("   • ID: {$evento->ID} | Título: '{$titulo_evento}'");
-        error_log("     Normalizado: '{$titulo_evento_normalizado}'");
-        
         // ESTRATEGIA 1: Comparación exacta normalizada
         if ($titulo_normalizado === $titulo_evento_normalizado) {
-            error_log("✅ ¡COINCIDENCIA EXACTA! (normalizada) - ID: {$evento->ID}");
+            error_log("✅ ¡COINCIDENCIA EXACTA! (normalizada) - ID: {$evento->ID} | '{$titulo_evento}'");
             return $evento->ID;
         }
         
-        // ESTRATEGIA 2: Comparación exacta sin normalizar
-        if (strcasecmp(trim($titulo_buscado), trim($titulo_evento)) === 0) {
-            error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
+        // ESTRATEGIA 2: Comparación exacta sin normalizar (ignorando HTML entities)
+        $titulo_evento_limpio = html_entity_decode($titulo_evento, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (strcasecmp(trim($titulo_buscado), trim($titulo_evento_limpio)) === 0) {
+            error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID} | '{$titulo_evento}'");
             return $evento->ID;
         }
         
-        // ESTRATEGIA 3: Contiene el título (parcial)
+        // Guardar coincidencias parciales para análisis posterior
         if (strpos($titulo_evento_normalizado, $titulo_normalizado) !== false) {
-            error_log("⚠️ Coincidencia PARCIAL encontrada - ID: {$evento->ID}");
-            error_log("   El título del post CONTIENE el texto buscado");
+            $coincidencias_parciales[$evento->ID] = $titulo_evento;
+        }
+    }
+    
+    if (!empty($coincidencias_parciales)) {
+        error_log("⚠️ Se encontraron " . count($coincidencias_parciales) . " coincidencias PARCIALES:");
+        foreach ($coincidencias_parciales as $id => $titulo) {
+            error_log("   • ID: {$id} | '{$titulo}'");
         }
     }
     
