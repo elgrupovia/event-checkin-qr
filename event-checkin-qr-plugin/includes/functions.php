@@ -46,7 +46,7 @@ function buscar_evento_robusto($titulo_buscado) {
     
     // Obtener TODOS los eventos publicados
     $args = [
-        'post_type'      => 'eventos_2025',
+        'post_type'      => 'eventos', // ✅ CORREGIDO: era 'eventos_2025'
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
@@ -56,7 +56,7 @@ function buscar_evento_robusto($titulo_buscado) {
     $eventos = get_posts($args);
     
     if (empty($eventos)) {
-        error_log("⚠️ No se encontraron eventos con post_type='eventos_2025'");
+        error_log("⚠️ No se encontraron eventos con post_type='eventos'");
         error_log("🔍 Verificando otros post types disponibles...");
         
         // Listar todos los post types registrados
