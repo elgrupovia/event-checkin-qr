@@ -2,7 +2,7 @@
 /**
  * functions.php — Plugin Event Check-In QR
  * Genera un PDF con código QR personalizado al ejecutar el hook JetFormBuilder "inscripciones_qr"
- * * ✅ Implementada lógica de búsqueda de eventos más robusta (exacta + similitud)
+ * * ✅ Implementada lógica de búsqueda de eventos más robusta (exacta + similitud simplificada)
  */
 
 if (!defined('ABSPATH')) {
@@ -67,16 +67,24 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 }
             }
 
-            // 2. Búsqueda por Similitud (Fuzzy Search) si el Intento 1 falla
+            // 2. Búsqueda por Similitud SIMPLIFICADA (Fuzzy Search) si el Intento 1 falla
             if (!$post_id) {
-                error_log("❌ Intento 1 falló. 🔎 Intento 2: Búsqueda por Similitud...");
+                error_log("❌ Intento 1 falló. 🔎 Intento 2: Búsqueda por Similitud (Simplificada)...");
+
+                // Simplificamos la cadena de búsqueda a solo las primeras 5 palabras clave, 
+                // ya que las búsquedas con cadenas muy largas pueden fallar.
+                $palabras = explode(' ', $titulo_evento_formulario);
+                // Usamos un máximo de 5 palabras para la búsqueda
+                $busqueda_simple = implode(' ', array_slice($palabras, 0, 5));
+                
+                error_log("🔎 Buscando por términos simplificados: '{$busqueda_simple}'");
 
                 $eventos_similares = get_posts([
                     'post_type'      => 'eventos_2025',
                     'post_status'    => 'publish',
                     'posts_per_page' => 1, 
                     'fields'         => 'ids',
-                    's'              => $titulo_evento_formulario, // Búsqueda nativa de WP (más flexible)
+                    's'              => $busqueda_simple, // Usamos la búsqueda simplificada
                     'orderby'        => 'relevance',
                 ]);
                 
