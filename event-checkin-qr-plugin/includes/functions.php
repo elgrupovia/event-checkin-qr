@@ -109,6 +109,8 @@ function buscar_evento_robusto($titulo_buscado) {
     
     if (!empty($palabras_clave)) {
     error_log((string)("🔑 Palabras clave extraídas: " . implode(', ', $palabras_clave)));
+            // Log detallado de comparación
+            error_log((string)("🔎 Comparando: [Buscado] '" . $titulo_normalizado . "' == [Evento] '" . $titulo_evento_normalizado . "' ? " . ($titulo_normalizado === $titulo_evento_normalizado ? '✅ IGUAL' : '❌ DIFERENTE')));
         
         $mejores_coincidencias = [];
         
