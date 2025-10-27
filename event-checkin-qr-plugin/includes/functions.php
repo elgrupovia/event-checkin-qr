@@ -38,11 +38,11 @@ function normalizar_texto($texto) {
  * Busca el evento usando múltiples estrategias
  */
 function buscar_evento_robusto($titulo_buscado) {
-    error_log("🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO ===");
-    error_log("📝 Título recibido del formulario: '{$titulo_buscado}'");
+    error_log((string)"🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO ===");
+    error_log((string)"📝 Título recibido del formulario: '{$titulo_buscado}'");
     
     $titulo_normalizado = normalizar_texto($titulo_buscado);
-    error_log("🔤 Título normalizado: '{$titulo_normalizado}'");
+    error_log((string)"🔤 Título normalizado: '{$titulo_normalizado}'");
     
     // Obtener TODOS los eventos publicados
     $args = [
@@ -55,45 +55,45 @@ function buscar_evento_robusto($titulo_buscado) {
     ];
     
     $eventos = get_posts($args);
-    error_log((var_dump($eventos)));
+    error_log((string)var_export($eventos, true));
     print_r($eventos);
     if (empty($eventos)) {
-        error_log("⚠️ No se encontraron eventos con post_type='eventos'");
-        error_log("🔍 Verificando otros post types disponibles...");
+    error_log((string)"⚠️ No se encontraron eventos con post_type='eventos'");
+    error_log((string)"🔍 Verificando otros post types disponibles...");
         
         // Listar todos los post types registrados
         $post_types = get_post_types(['public' => true], 'names');
-        error_log("📋 Post types disponibles: " . implode(', ', $post_types));
+    error_log((string)("📋 Post types disponibles: " . implode(', ', $post_types)));
         
         return null;
     }
     
-    error_log("✅ Se encontraron " . count($eventos) . " eventos publicados");
-    error_log("📋 Lista de eventos disponibles:");
+    error_log((string)("✅ Se encontraron " . count($eventos) . " eventos publicados"));
+    error_log((string)"📋 Lista de eventos disponibles:");
     
     foreach ($eventos as $evento) {
         $titulo_evento = get_the_title($evento->ID);
         $titulo_evento_normalizado = normalizar_texto($titulo_evento);
         
-        error_log("   • ID: {$evento->ID} | Título: '{$titulo_evento}'");
-        error_log("     Normalizado: '{$titulo_evento_normalizado}'");
+    error_log((string)"   • ID: {$evento->ID} | Título: '{$titulo_evento}'");
+    error_log((string)"     Normalizado: '{$titulo_evento_normalizado}'");
         
         // ESTRATEGIA 1: Comparación exacta normalizada
         if ($titulo_normalizado === $titulo_evento_normalizado) {
-            error_log("✅ ¡COINCIDENCIA EXACTA! (normalizada) - ID: {$evento->ID}");
+            error_log((string)"✅ ¡COINCIDENCIA EXACTA! (normalizada) - ID: {$evento->ID}");
             return $evento->ID;
         }
         
         // ESTRATEGIA 2: Comparación exacta sin normalizar
         if (strcasecmp(trim($titulo_buscado), trim($titulo_evento)) === 0) {
-            error_log("✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
+            error_log((string)"✅ ¡COINCIDENCIA EXACTA! (sin normalizar) - ID: {$evento->ID}");
             return $evento->ID;
         }
         
         
     }
     
-    error_log("🔎 Intentando búsqueda por palabras clave...");
+    error_log((string)"🔎 Intentando búsqueda por palabras clave...");
     
     // ESTRATEGIA 4: Búsqueda por palabras clave principales
     $palabras_clave = array_filter(explode(' ', $titulo_normalizado), function($palabra) {
@@ -101,7 +101,7 @@ function buscar_evento_robusto($titulo_buscado) {
     });
     
     if (!empty($palabras_clave)) {
-        error_log("🔑 Palabras clave extraídas: " . implode(', ', $palabras_clave));
+    error_log((string)("🔑 Palabras clave extraídas: " . implode(', ', $palabras_clave)));
         
         $mejores_coincidencias = [];
         
@@ -125,34 +125,34 @@ function buscar_evento_robusto($titulo_buscado) {
             $mejor_id = array_key_first($mejores_coincidencias);
             $mejor_puntuacion = $mejores_coincidencias[$mejor_id];
             
-            error_log("🎯 Mejor coincidencia por palabras clave:");
-            error_log("   ID: {$mejor_id} | Puntuación: {$mejor_puntuacion}/{" . count($palabras_clave) . "}");
-            error_log("   Título: '" . get_the_title($mejor_id) . "'");
+            error_log((string)"🎯 Mejor coincidencia por palabras clave:");
+            error_log((string)"   ID: {$mejor_id} | Puntuación: {$mejor_puntuacion}/{" . count($palabras_clave) . "}");
+            error_log((string)"   Título: '" . get_the_title($mejor_id) . "'");
             
             // Solo devolver si tiene al menos 50% de coincidencia
             if ($mejor_puntuacion >= (count($palabras_clave) * 0.5)) {
-                error_log("✅ Coincidencia suficiente (≥50%). Usando este evento.");
+                error_log((string)"✅ Coincidencia suficiente (≥50%). Usando este evento.");
                 return $mejor_id;
             } else {
-                error_log("⚠️ Coincidencia insuficiente (<50%). No se usará.");
+                error_log((string)"⚠️ Coincidencia insuficiente (<50%). No se usará.");
             }
         }
     }
     
     // ESTRATEGIA 5: Búsqueda por slug
-    error_log("🔎 Intentando búsqueda por slug...");
+    error_log((string)"🔎 Intentando búsqueda por slug...");
     $slug_buscado = sanitize_title($titulo_buscado);
-    error_log("🔗 Slug generado: '{$slug_buscado}'");
+    error_log((string)"🔗 Slug generado: '{$slug_buscado}'");
     
     foreach ($eventos as $evento) {
         if ($evento->post_name === $slug_buscado) {
-            error_log("✅ ¡COINCIDENCIA POR SLUG! - ID: {$evento->ID}");
+            error_log((string)"✅ ¡COINCIDENCIA POR SLUG! - ID: {$evento->ID}");
             return $evento->ID;
         }
     }
     
-    error_log("❌ No se encontró ninguna coincidencia válida");
-    error_log("🔍 === FIN BÚSQUEDA ROBUSTA ===");
+    error_log((string)"❌ No se encontró ninguna coincidencia válida");
+    error_log((string)"🔍 === FIN BÚSQUEDA ROBUSTA ===");
     
     return null;
 }
@@ -161,8 +161,8 @@ function buscar_evento_robusto($titulo_buscado) {
  * Función principal: genera el PDF con QR + imagen del evento
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
-    error_log("🚀 [inscripciones_qr] Hook ejecutado");
-    error_log("📥 Datos completos del formulario: " . print_r($request, true));
+    error_log((string)"🚀 [inscripciones_qr] Hook ejecutado");
+    error_log((string)("📥 Datos completos del formulario: " . print_r($request, true)));
 
     try {
         // Datos del participante
@@ -170,7 +170,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
-        error_log("📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
+    error_log((string)"📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
 
         // Obtener nombre del evento desde el formulario
         $titulo_evento_formulario = '';
@@ -187,12 +187,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             
             if ($post_id) {
                 $titulo_evento_encontrado = trim(get_the_title($post_id));
-                error_log("✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
+                error_log((string)"✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
             } else {
-                error_log("❌ No se pudo encontrar el evento. La imagen NO se insertará.");
+                error_log((string)"❌ No se pudo encontrar el evento. La imagen NO se insertará.");
             }
         } else {
-            error_log("⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
+            error_log((string)"⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
         }
         
         $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
@@ -210,7 +210,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $upload_dir = wp_upload_dir();
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
-        error_log("🧾 QR generado en: " . $qr_path);
+    error_log((string)("🧾 QR generado en: " . $qr_path));
 
         $pdf = new TCPDF();
         $pdf->AddPage();
