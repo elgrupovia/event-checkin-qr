@@ -55,7 +55,14 @@ function buscar_evento_robusto($titulo_buscado) {
     ];
     
     $eventos = get_posts($args);
-    error_log((string)var_export($eventos, true));
+    if (!empty($eventos) && is_array($eventos)) {
+        $eventos_log = array_map(function($evento) {
+            return "ID: {$evento->ID}, Título: " . get_the_title($evento->ID);
+        }, $eventos);
+        error_log((string)("🗂 Eventos encontrados: " . implode(' | ', $eventos_log)));
+    } else {
+        error_log((string)("🗂 Eventos encontrados: " . var_export($eventos, true)));
+    }
     print_r($eventos);
     if (empty($eventos)) {
     error_log((string)"⚠️ No se encontraron eventos con post_type='eventos'");
