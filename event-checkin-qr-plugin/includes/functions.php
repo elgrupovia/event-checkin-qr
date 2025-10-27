@@ -56,6 +56,7 @@ function buscar_evento_robusto($titulo_buscado) {
     
     $eventos = get_posts($args);
     error_log((var_dump($eventos)));
+    print_r($eventos);
     if (empty($eventos)) {
         error_log("⚠️ No se encontraron eventos con post_type='eventos'");
         error_log("🔍 Verificando otros post types disponibles...");
