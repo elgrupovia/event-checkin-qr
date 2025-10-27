@@ -37,33 +37,37 @@ function normalizar_texto($texto) {
 /**
  * Busca el evento usando múltiples estrategias
  */
-function buscar_evento_robusto($titulo_buscado) {
+function buscar_evento_robusto($titulo_buscado, $ciudad_slug = null) {
     error_log((string)"🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO ===");
     error_log((string)"📝 Título recibido del formulario: '{$titulo_buscado}'");
-    
+    if ($ciudad_slug) {
+        error_log((string)"🏙️ Ciudad recibida: '{$ciudad_slug}'");
+    }
     $titulo_normalizado = normalizar_texto($titulo_buscado);
     error_log((string)"🔤 Título normalizado: '{$titulo_normalizado}'");
-    
+
     // Obtener TODOS los eventos publicados, filtrando por año y ciudad si se requiere
+    $tax_query = [
+        [
+            'taxonomy' => 'ano',
+            'field'    => 'slug',
+            'terms'    => '2025',
+        ]
+    ];
+    if ($ciudad_slug) {
+        $tax_query[] = [
+            'taxonomy' => 'ciudad',
+            'field'    => 'slug',
+            'terms'    => $ciudad_slug,
+        ];
+    }
     $args = [
         'post_type'      => 'eventos',
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
         'order'          => 'DESC',
-        'tax_query' => [
-            'relation' => 'AND',
-            [
-                'taxonomy' => 'ano',
-                'field'    => 'slug',
-                'terms'    => '2025',
-            ],
-            [
-                'taxonomy' => 'ciudad',
-                'field'    => 'slug',
-                'terms'    => 'nombre-de-la-ciudad', // <-- Cambia esto dinámicamente según tu lógica
-            ],
-        ],
+        'tax_query'      => $tax_query,
     ];
 // --- REGISTRO DE TAXONOMÍA CIUDAD (si no existe en otro archivo/plugin) ---
 add_action('init', function() {
