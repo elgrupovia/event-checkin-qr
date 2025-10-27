@@ -46,12 +46,18 @@ function buscar_evento_robusto($titulo_buscado) {
     
     // Obtener TODOS los eventos publicados
     $args = [
-        'post_type'      => 'eventos', 
-        //'category'       => '2025',
+        'post_type'      => 'eventos',
         'post_status'    => 'publish',
         'posts_per_page' => -1,
         'orderby'        => 'date',
-        'order'          => 'DESC'
+        'order'          => 'DESC',
+        'tax_query' => [
+            [
+                'taxonomy' => 'ano',
+                'field'    => 'slug', 
+                'terms'    => '2025', 
+            ],
+        ],
     ];
     
     $eventos = get_posts($args);
