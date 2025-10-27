@@ -135,6 +135,52 @@ add_action('init', function() {
     
     error_log((string)"🔎 Intentando búsqueda por palabras clave...");
     
+    // ESTRATEGIA 4: Búsqueda prioritaria por palabras clave principales y ciudad
+    $palabras_clave = array_filter(explode(' ', $titulo_normalizado), function($palabra) {
+        return strlen($palabra) > 3; // Solo palabras de más de 3 caracteres
+    });
+
+    // Palabras clave prioritarias (ajusta según tus necesidades)
+    $palabras_prioritarias = ['arquitectura', 'residencial'];
+    $ciudad_prioritaria = 'barcelona';
+
+    $candidatos_prioritarios = [];
+    foreach ($eventos as $evento) {
+        $titulo_evento_normalizado = normalizar_texto(get_the_title($evento->ID));
+        $tiene_todas_prioritarias = true;
+        foreach ($palabras_prioritarias as $palabra) {
+            if (strpos($titulo_evento_normalizado, $palabra) === false) {
+                $tiene_todas_prioritarias = false;
+                break;
+            }
+        }
+        if ($tiene_todas_prioritarias && strpos($titulo_evento_normalizado, $ciudad_prioritaria) !== false) {
+            // Contiene todas las palabras prioritarias y la ciudad
+            $candidatos_prioritarios[] = $evento->ID;
+        }
+    }
+
+    if (!empty($candidatos_prioritarios)) {
+        // Si hay varios, elegimos el que más palabras clave coincida
+        $mejor_id = null;
+        $mejor_puntuacion = 0;
+        foreach ($candidatos_prioritarios as $evento_id) {
+            $titulo_evento_normalizado = normalizar_texto(get_the_title($evento_id));
+            $coincidencias = 0;
+            foreach ($palabras_clave as $palabra) {
+                if (strpos($titulo_evento_normalizado, $palabra) !== false) {
+                    $coincidencias++;
+                }
+            }
+            if ($coincidencias > $mejor_puntuacion) {
+                $mejor_puntuacion = $coincidencias;
+                $mejor_id = $evento_id;
+            }
+        }
+        error_log((string)"🎯 Coincidencia prioritaria por tema y ciudad: ID={$mejor_id}, Puntuación={$mejor_puntuacion}/" . count($palabras_clave));
+        return $mejor_id;
+    }
+
     // ESTRATEGIA 4: Búsqueda por palabras clave principales
     $palabras_clave = array_filter(explode(' ', $titulo_normalizado), function($palabra) {
         return strlen($palabra) > 3; // Solo palabras de más de 3 caracteres
