@@ -44,7 +44,7 @@ function buscar_evento_robusto($titulo_buscado) {
     $titulo_normalizado = normalizar_texto($titulo_buscado);
     error_log((string)"🔤 Título normalizado: '{$titulo_normalizado}'");
     
-    // Obtener TODOS los eventos publicados
+    // Obtener TODOS los eventos publicados, filtrando por año y ciudad si se requiere
     $args = [
         'post_type'      => 'eventos',
         'post_status'    => 'publish',
@@ -52,13 +52,36 @@ function buscar_evento_robusto($titulo_buscado) {
         'orderby'        => 'date',
         'order'          => 'DESC',
         'tax_query' => [
+            'relation' => 'AND',
             [
                 'taxonomy' => 'ano',
-                'field'    => 'slug', 
-                'terms'    => '2025', 
+                'field'    => 'slug',
+                'terms'    => '2025',
+            ],
+            [
+                'taxonomy' => 'ciudad',
+                'field'    => 'slug',
+                'terms'    => 'nombre-de-la-ciudad', // <-- Cambia esto dinámicamente según tu lógica
             ],
         ],
     ];
+// --- REGISTRO DE TAXONOMÍA CIUDAD (si no existe en otro archivo/plugin) ---
+add_action('init', function() {
+    if (!taxonomy_exists('ciudad')) {
+        register_taxonomy(
+            'ciudad',
+            'eventos',
+            [
+                'label'        => __('Ciudad'),
+                'rewrite'      => ['slug' => 'ciudad'],
+                'hierarchical' => false,
+                'public'       => true,
+                'show_ui'      => true,
+                'show_admin_column' => true,
+            ]
+        );
+    }
+});
     
     $eventos = get_posts($args);
     if (!empty($eventos) && is_array($eventos)) {
