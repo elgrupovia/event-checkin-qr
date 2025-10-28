@@ -134,19 +134,18 @@ error_log('✅ Evento elegido ID: ' . $event_id);
  * Función principal: genera el PDF con QR + imagen del evento
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
-   // error_log((string)"🚀 [inscripciones_qr] Hook ejecutado");
-    //error_log((string)("📥 Datos completos del formulario: " . print_r($request, true)));
-
     try {
         // Datos del participante
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
+        $apellidos_persona = isset($request['apellidos']) ? sanitize_text_field($request['apellidos']) : ''; // 👈 nuevo campo
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
-   // error_log((string)"📦 Datos recibidos: Empresa={$nombre_empresa}, Nombre={$nombre_persona}, Cargo={$cargo_persona}");
+        // Construimos el nombre completo
+        $nombre_completo = trim($nombre_persona . ' ' . $apellidos_persona);
 
         // Obtener nombre del evento desde el formulario
-       $titulo_evento_formulario = '';
+        $titulo_evento_formulario = '';
         if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
             $titulo_evento_formulario = trim(sanitize_text_field($request['eventos_2025'][0]));
         }
@@ -170,9 +169,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         
         $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
 
-        // --- GENERACIÓN DE PDF Y QR (sin cambios) ---
+        // --- GENERACIÓN DE PDF Y QR ---
         
-        $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_persona}\nCargo: {$cargo_persona}";
+        // 👇 Ahora el QR incluye nombre completo
+        $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_completo}\nCargo: {$cargo_persona}";
         $qr = Builder::create()
             ->writer(new PngWriter())
             ->data($data)
@@ -183,7 +183,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $upload_dir = wp_upload_dir();
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
-    error_log((string)("🧾 QR generado en: " . $qr_path));
+        error_log((string)("🧾 QR generado en: " . $qr_path));
 
         $pdf = new TCPDF();
         $pdf->AddPage();
@@ -245,14 +245,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetFont('helvetica', '', 12);
         $pdf->Cell(0, 8, "Empresa: {$nombre_empresa}", 0, 1);
-        $pdf->Cell(0, 8, "Nombre: {$nombre_persona}", 0, 1);
+        $pdf->Cell(0, 8, "Nombre completo: {$nombre_completo}", 0, 1);
         $pdf->Cell(0, 8, "Cargo: {$cargo_persona}", 0, 1);
 
         $pdf->Ln(10);
         $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
         // Guardar PDF
-        $pdf_filename = 'entrada_' . sanitize_file_name($nombre_persona) . '_' . time() . '.pdf';
+        $pdf_filename = 'entrada_' . sanitize_file_name($nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         error_log("✅ PDF generado correctamente en: " . $pdf_path);
@@ -264,4 +264,5 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         error_log("❌ Stack trace: " . $e->getTraceAsString());
     }
 }
+
 ?>
