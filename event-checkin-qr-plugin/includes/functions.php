@@ -61,7 +61,7 @@ function buscar_evento_robusto($titulo_buscado) {
     //$titulo_normalizado = normalizar_texto($titulo_buscado);
     $primeras = primeras_palabras($titulo_buscado, 3);
     //error_log((string)"🔤 Título normalizado: '{$titulo_normalizado}'");
-    $ciudades = ['barcelona', 'valencia' , 'madrid', 'bilbao'];
+    $ciudades = ['barcelona', 'valencia' , 'madrid', 'bilbao', 'san sebastián'];
 
 $ciudad_form = null;
 $normForm = normalizar_texto($titulo_buscado); // tu función
@@ -138,7 +138,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // Datos del participante
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
-        $apellidos_persona = isset($request['apellidos']) ? sanitize_text_field($request['apellidos']) : ''; // 👈 nuevo campo
+        // Intentamos obtener los apellidos desde varias fuentes posibles
+        $apellidos_persona = '';
+
+        if (!empty($request['apellidos'])) {
+            $apellidos_persona = sanitize_text_field($request['apellidos']);
+        } elseif (!empty($request['last_name'])) {
+            // JetFormBuilder a veces usa "last_name" si el campo está vinculado al usuario actual
+            $apellidos_persona = sanitize_text_field($request['last_name']);
+        } elseif (is_user_logged_in()) {
+            // Si el usuario está logueado, tomamos su apellido desde el perfil de WP
+            $user = wp_get_current_user();
+            if (!empty($user->last_name)) {
+                $apellidos_persona = sanitize_text_field($user->last_name);
+            }
+        }
+
         $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
         // Construimos el nombre completo
