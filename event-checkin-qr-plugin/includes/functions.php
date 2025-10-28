@@ -21,32 +21,17 @@ add_action('jet-form-builder/custom-action/inscripciones_qr', 'generar_qr_pdf_pe
  * Normaliza texto para comparación (quita acentos, convierte a minúsculas, normaliza espacios)
  */
 function normalizar_texto($texto) {
-    // Convertir a minúsculas
     $texto = mb_strtolower($texto, 'UTF-8');
-    
-    // Quitar acentos y caracteres especiales
     $texto = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
-    
-    // Normalizar espacios múltiples y trim
     $texto = preg_replace('/\s+/', ' ', trim($texto));
-    
-    // Quitar caracteres especiales excepto espacios y guiones
     $texto = preg_replace('/[^a-z0-9\s\-]/', '', $texto);
-    
     return $texto;
 }
 
 function primeras_palabras($texto, $limite = 3) {
-    // Elimina espacios múltiples y espacios al inicio/final
     $texto = trim(preg_replace('/\s+/', ' ', $texto));
-
-    // Divide en palabras por espacio
     $palabras = explode(' ', $texto);
-
-    // Coge solo las primeras $limite palabras
     $primeras = array_slice($palabras, 0, $limite);
-
-    // Devuelve como texto unido
     return implode(' ', $primeras);
 }
 
@@ -54,28 +39,21 @@ function primeras_palabras($texto, $limite = 3) {
  * Busca el evento usando múltiples estrategias
  */
 function buscar_evento_robusto($titulo_buscado) {
-     error_log((string)"🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO ===" . $titulo_buscado);
-    //error_log((string)"📝 Título recibido del formulario: '{$titulo_buscado}'");
-    
-    
-    //$titulo_normalizado = normalizar_texto($titulo_buscado);
+    error_log("🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO === " . $titulo_buscado);
+
     $primeras = primeras_palabras($titulo_buscado, 3);
-    //error_log((string)"🔤 Título normalizado: '{$titulo_normalizado}'");
-    $ciudades = ['barcelona', 'valencia' , 'madrid', 'bilbao', 'san sebastián'];
+    $ciudades = ['barcelona', 'valencia', 'madrid', 'bilbao', 'san sebastián'];
 
-$ciudad_form = null;
-$normForm = normalizar_texto($titulo_buscado); // tu función
+    $ciudad_form = null;
+    $normForm = normalizar_texto($titulo_buscado);
 
-foreach ($ciudades as $c) {
-    if (stripos($normForm, normalizar_texto($c)) !== false) {
-        $ciudad_form = $c; // ciudad detectada
-        break;
+    foreach ($ciudades as $c) {
+        if (stripos($normForm, normalizar_texto($c)) !== false) {
+            $ciudad_form = $c;
+            break;
+        }
     }
-}
 
-
-    
-    // Obtener TODOS los eventos publicados, filtrando por año y ciudad si se requiere
     $args = [
         'post_type'      => 'eventos',
         'post_status'    => 'publish',
@@ -93,43 +71,32 @@ foreach ($ciudades as $c) {
             [
                 'taxonomy' => 'ciudades',
                 'field'    => 'slug',
-                'terms'    => $ciudades, 
+                'terms'    => $ciudades,
             ],
         ],
     ];
 
-    
-
-    
     $eventos = get_posts($args);
     error_log('EVENTOS encontrados: ' . count($eventos));
-   $event_id = 0;
+    $event_id = 0;
 
-// 1) Comprobamos que tenemos eventos y que detectamos una ciudad en el título del formulario
-if (!empty($eventos) && !empty($ciudad_form)) {
-
-    // 2) Preparamos la ciudad en "formato normalizado" para comparar mejor (sin acentos, minúsculas, etc.)
-    $ciudad_buscar = normalizar_texto($ciudad_form);
-
-    // 3) Recorremos cada evento devuelto por la query
-    foreach ($eventos as $evento) {
-
-        // 4) Obtenemos el título del evento y lo normalizamos igual
-        $titulo_evento = get_the_title($evento->ID);
-        $titulo_evento_norm = normalizar_texto($titulo_evento);
-
-        // 5) Si el título del evento contiene la ciudad, ¡es nuestro candidato!
-        if (stripos($titulo_evento_norm, $ciudad_buscar) !== false) {
-            $event_id = (int) $evento->ID; // guardamos el ID
-            break; // paramos al encontrar el primero que coincide
+    if (!empty($eventos) && !empty($ciudad_form)) {
+        $ciudad_buscar = normalizar_texto($ciudad_form);
+        foreach ($eventos as $evento) {
+            $titulo_evento = get_the_title($evento->ID);
+            $titulo_evento_norm = normalizar_texto($titulo_evento);
+            if (stripos($titulo_evento_norm, $ciudad_buscar) !== false) {
+                $event_id = (int)$evento->ID;
+                break;
+            }
         }
     }
-}
-error_log('🏙️ Ciudad detectada: ' . ($ciudad_form ?: 'ninguna'));
-error_log('✅ Evento elegido ID: ' . $event_id);
+
+    error_log('🏙️ Ciudad detectada: ' . ($ciudad_form ?: 'ninguna'));
+    error_log('✅ Evento elegido ID: ' . $event_id);
     return $event_id;
 }
-   
+
 /**
  * Función principal: genera el PDF con QR + imagen del evento
  */
@@ -138,26 +105,25 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // Datos del participante
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
-        // Intentamos obtener los apellidos desde varias fuentes posibles
-        $apellidos_persona = '';
 
+        // Apellidos: varias fuentes posibles
+        $apellidos_persona = '';
         if (!empty($request['apellidos'])) {
             $apellidos_persona = sanitize_text_field($request['apellidos']);
         } elseif (!empty($request['last_name'])) {
-            // JetFormBuilder a veces usa "last_name" si el campo está vinculado al usuario actual
             $apellidos_persona = sanitize_text_field($request['last_name']);
         } elseif (is_user_logged_in()) {
-            // Si el usuario está logueado, tomamos su apellido desde el perfil de WP
             $user = wp_get_current_user();
             if (!empty($user->last_name)) {
                 $apellidos_persona = sanitize_text_field($user->last_name);
             }
         }
 
-        $cargo_persona  = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
+        $cargo_persona = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
-        // Construimos el nombre completo
+        // Construimos el nombre completo y decodificamos entidades HTML
         $nombre_completo = trim($nombre_persona . ' ' . $apellidos_persona);
+        $nombre_completo = html_entity_decode($nombre_completo, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         // Obtener nombre del evento desde el formulario
         $titulo_evento_formulario = '';
@@ -169,24 +135,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $titulo_evento_encontrado = $titulo_evento_formulario;
 
         if ($titulo_evento_formulario) {
-            // 🚀 BÚSQUEDA ROBUSTA CON DEPURACIÓN COMPLETA
             $post_id = buscar_evento_robusto($titulo_evento_formulario);
-            
             if ($post_id) {
                 $titulo_evento_encontrado = trim(get_the_title($post_id));
-                error_log((string)"✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
+                error_log("✅ EVENTO FINAL ENCONTRADO: ID={$post_id}, Título='{$titulo_evento_encontrado}'");
             } else {
-                error_log((string)"❌ No se pudo encontrar el evento. La imagen NO se insertará.");
+                error_log("❌ No se pudo encontrar el evento. La imagen NO se insertará.");
             }
         } else {
-            error_log((string)"⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
+            error_log("⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
         }
-        
-        $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
 
-        // --- GENERACIÓN DE PDF Y QR ---
-        
-        // 👇 Ahora el QR incluye nombre completo
+        // Decodificar título del evento
+        $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
+        $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // --- GENERACIÓN DE QR ---
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_completo}\nCargo: {$cargo_persona}";
         $qr = Builder::create()
             ->writer(new PngWriter())
@@ -198,14 +162,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $upload_dir = wp_upload_dir();
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
-        error_log((string)("🧾 QR generado en: " . $qr_path));
+        error_log("🧾 QR generado en: " . $qr_path);
 
+        // --- GENERACIÓN DE PDF ---
         $pdf = new TCPDF();
         $pdf->AddPage();
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
-        // Imagen del evento (si se encontró)
+        // Imagen del evento
         $imagen_insertada = false;
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -214,11 +179,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $imagen_id = get_post_thumbnail_id($post_id);
                 $imagen_meta = wp_get_attachment_metadata($imagen_id);
                 if ($imagen_meta) {
-                   $imagen_path = $upload_dir['basedir'] . '/' . $imagen_meta['file'];
+                    $imagen_path = $upload_dir['basedir'] . '/' . $imagen_meta['file'];
                 }
-                
-                $tmp = null;
 
+                $tmp = null;
                 if (!file_exists($imagen_path)) {
                     if (function_exists('download_url')) {
                         $tmp = download_url($imagen_url);
@@ -239,7 +203,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 } else {
                     error_log("⚠️ La imagen destacada no se pudo localizar físicamente");
                 }
-                
+
                 if ($tmp && !is_wp_error($tmp) && file_exists($tmp)) {
                     @unlink($tmp);
                 }
@@ -247,7 +211,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 error_log("⚠️ El evento ID={$post_id} no tiene imagen destacada");
             }
         }
-        
+
         // Contenido del PDF
         $pdf->Ln($imagen_insertada ? 70 : 20);
         $pdf->SetFont('helvetica', 'B', 16);
@@ -266,7 +230,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(10);
         $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
-        // Reemplazar solo caracteres no permitidos en filenames por guion
+        // Guardar PDF con nombre seguro
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
