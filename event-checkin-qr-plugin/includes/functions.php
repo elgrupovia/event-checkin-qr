@@ -260,7 +260,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetFont('helvetica', '', 12);
         $pdf->Cell(0, 8, "Empresa: {$nombre_empresa}", 0, 1);
-        $pdf->Cell(0, 8, "Nombre completo: {$nombre_completo}", 0, 1);
+        $pdf->Cell(0, 8, "Nombre: {$nombre_completo}", 0, 1);
         $pdf->Cell(0, 8, "Cargo: {$cargo_persona}", 0, 1);
 
         $pdf->Ln(10);
