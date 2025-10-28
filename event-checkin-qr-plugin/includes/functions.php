@@ -202,7 +202,36 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
+        // --- IMAGEN DEL EVENTO ---
+        $imagen_insertada = false;
+
+        if ($post_id) {
+            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+            if ($imagen_url) {
+                $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
+                $imagen_path = $imagen_info['path'];
+                $tmp = $imagen_info['tmp'];
+
+                if (file_exists($imagen_path)) {
+                    try {
+                        // Imagen más pequeña sin distorsión: 120mm ancho
+                        $pdf->Image($imagen_path, 45, 15, 120, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+                        $imagen_insertada = true;
+                        error_log("✅ Imagen destacada insertada sin compresión");
+                    } catch (Exception $e) {
+                        error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
+                    }
+                }
+
+                if ($tmp && !is_wp_error($tmp) && file_exists($tmp)) {
+                    @unlink($tmp);
+                }
+            }
+        }
+
         // --- CONTENIDO DEL PDF ---
+        $pdf->SetY($imagen_insertada ? 100 : 20);
+
         // Encabezado
         $pdf->SetFont('helvetica', 'B', 20);
         $pdf->SetTextColor(0, 0, 0);
@@ -250,13 +279,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // QR Code
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetTextColor(60, 60, 60);
-        $pdf->Cell(0, 5, 'Código de acceso:', 0, 1, 'C');
-        $pdf->Ln(2);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->Cell(0, 5, 'Código de escaneo:', 0, 1, 'C');
+        $pdf->Ln(3);
 
-        // Posicionar QR centrado
-        $qr_size = 60;
-        $qr_x = (210 - $qr_size) / 2; // Centra el QR
+        // Posicionar QR centrado - más pequeño y sin distorsión
+        $qr_size = 50;
+        $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
         // Guardar PDF con nombre seguro
@@ -273,4 +302,4 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     }
 }
 
-?> 
+?>
