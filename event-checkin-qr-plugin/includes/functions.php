@@ -266,8 +266,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(10);
         $pdf->Image($qr_path, 70, $pdf->GetY(), 70, 70, 'PNG');
 
-        // Guardar PDF
-        $pdf_filename = 'entrada_' . sanitize_file_name($nombre_completo) . '_' . time() . '.pdf';
+        // Reemplazar solo caracteres no permitidos en filenames por guion
+        $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         error_log("✅ PDF generado correctamente en: " . $pdf_path);
