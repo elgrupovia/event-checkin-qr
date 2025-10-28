@@ -3,7 +3,7 @@
  * functions.php — Plugin Event Check-In QR
  * Genera un PDF con código QR personalizado al ejecutar el hook JetFormBuilder "inscripciones_qr"
  * ✅ Búsqueda mejorada con normalización de texto y múltiples estrategias
- * ✅ Imagen de alta calidad, responsive y diseño profesional mejorado
+ * ✅ Imagen de ALTA CALIDAD y TAMAÑO GRANDE, responsive y diseño profesional mejorado
  */
 
 if (!defined('ABSPATH')) {
@@ -210,10 +210,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
         $pdf->AddPage();
-        $pdf->SetMargins(15, 15, 15);
+        $pdf->SetMargins(10, 10, 10);
         $pdf->SetAutoPageBreak(true, 15);
 
         $imagen_insertada = false;
+        $imagen_altura = 0;
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -224,9 +225,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        $pdf->Image($imagen_path, 45, 15, 120, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+                        // IMAGEN MÁS GRANDE: 170mm de ancho (máximo permitido con márgenes de 10mm)
+                        $imagen_altura = 120;
+                        $pdf->Image($imagen_path, 20, 10, 170, $imagen_altura, '', '', '', true, 300, '', false, false, 0, false, false, false);
                         $imagen_insertada = true;
-                        error_log("✅ Imagen destacada insertada sin compresión");
+                        error_log("✅ Imagen destacada insertada sin compresión - Tamaño: 170x120mm");
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
                     }
@@ -238,49 +241,50 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        $pdf->SetY($imagen_insertada ? 100 : 20);
+        // Posición después de la imagen
+        $pdf->SetY($imagen_insertada ? (10 + $imagen_altura + 5) : 20);
 
-        $pdf->SetFont('helvetica', 'B', 20);
+        $pdf->SetFont('helvetica', 'B', 18);
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->Cell(0, 12, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->Cell(0, 10, 'ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(2);
 
         $pdf->SetDrawColor(0, 0, 0);
-        $pdf->SetLineWidth(0.3);
-        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
-        $pdf->Ln(8);
-
-        $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
         $pdf->Ln(6);
 
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->Cell(45, 6, 'EMPRESA:', 0, 0);
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->Cell(0, 6, $nombre_empresa, 0, 1);
-
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->Cell(45, 6, 'NOMBRE:', 0, 0);
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->Cell(0, 6, $nombre_completo, 0, 1);
-
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->Cell(45, 6, 'CARGO:', 0, 0);
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->Cell(0, 6, $cargo_persona, 0, 1);
-
-        $pdf->Ln(10);
-
-        $pdf->SetDrawColor(0, 0, 0);
-        $pdf->SetLineWidth(0.3);
-        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
-        $pdf->Ln(10);
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(4);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(0, 5, 'Código de escaneo:', 0, 1, 'C');
-        $pdf->Ln(3);
+        $pdf->Cell(40, 5, 'EMPRESA:', 0, 0);
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 5, $nombre_empresa, 0, 1);
 
-        $qr_size = 50;
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->Cell(40, 5, 'NOMBRE:', 0, 0);
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 5, $nombre_completo, 0, 1);
+
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->Cell(40, 5, 'CARGO:', 0, 0);
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Cell(0, 5, $cargo_persona, 0, 1);
+
+        $pdf->Ln(8);
+
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
+        $pdf->Ln(8);
+
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->Cell(0, 4, 'Código de escaneo:', 0, 1, 'C');
+        $pdf->Ln(2);
+
+        $qr_size = 55;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
