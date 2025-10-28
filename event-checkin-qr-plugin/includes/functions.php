@@ -37,13 +37,13 @@ function primeras_palabras($texto, $limite = 3) {
 }
 
 /**
- * Busca el evento usando múltiples estrategias
+ * Busca el evento usando múltiples estrategias y fallback forzado
  */
 function buscar_evento_robusto($titulo_buscado) {
-    error_log("🔍 === INICIO BÚSQUEDA ROBUSTA DE EVENTO === " . $titulo_buscado);
+    error_log("🔍 INICIO BÚSQUEDA ROBUSTA: " . $titulo_buscado);
 
     $primeras = primeras_palabras($titulo_buscado, 3);
-    $ciudades = ['barcelona', 'valencia', 'madrid', 'bilbao', 'san sebastián'];
+    $ciudades = ['barcelona', 'valencia', 'madrid', 'bilbao'];
 
     $ciudad_form = null;
     $normForm = normalizar_texto($titulo_buscado);
@@ -78,7 +78,6 @@ function buscar_evento_robusto($titulo_buscado) {
     ];
 
     $eventos = get_posts($args);
-    error_log('EVENTOS encontrados: ' . count($eventos));
     $event_id = 0;
 
     if (!empty($eventos) && !empty($ciudad_form)) {
@@ -88,6 +87,25 @@ function buscar_evento_robusto($titulo_buscado) {
             $titulo_evento_norm = normalizar_texto($titulo_evento);
             if (stripos($titulo_evento_norm, $ciudad_buscar) !== false) {
                 $event_id = (int)$evento->ID;
+                break;
+            }
+        }
+    }
+
+    // --- Fallback: búsqueda forzada por título completo si no se encuentra ---
+    if ($event_id === 0) {
+        $eventos_all = get_posts([
+            'post_type'      => 'eventos',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+        ]);
+
+        foreach ($eventos_all as $evento) {
+            $titulo_evento = get_the_title($evento->ID);
+            $titulo_evento_norm = normalizar_texto($titulo_evento);
+            if (stripos($titulo_evento_norm, normalizar_texto($titulo_buscado)) !== false) {
+                $event_id = (int)$evento->ID;
+                error_log("⚡ EVENTO FORZADO ENCONTRADO: {$titulo_evento}");
                 break;
             }
         }
@@ -105,7 +123,6 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir) {
     $tmp = null;
     $imagen_path = '';
 
-    // Primero intenta obtener la ruta local
     $attachment_id = attachment_url_to_postid($imagen_url);
     if ($attachment_id) {
         $imagen_meta = wp_get_attachment_metadata($attachment_id);
@@ -114,7 +131,6 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir) {
         }
     }
 
-    // Si no existe localmente, descárgala
     if (!file_exists($imagen_path)) {
         if (function_exists('download_url')) {
             $tmp = download_url($imagen_url, 300);
@@ -132,11 +148,9 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir) {
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
-        // Datos del participante
         $nombre_empresa = isset($request['nombre_de_empresa']) ? sanitize_text_field($request['nombre_de_empresa']) : 'Empresa Desconocida';
         $nombre_persona = isset($request['nombre']) ? sanitize_text_field($request['nombre']) : 'Invitado';
 
-        // Apellidos: varias fuentes posibles
         $apellidos_persona = '';
         if (!empty($request['apellidos'])) {
             $apellidos_persona = sanitize_text_field($request['apellidos']);
@@ -151,11 +165,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $cargo_persona = isset($request['cargo']) ? sanitize_text_field($request['cargo']) : 'Cargo no especificado';
 
-        // Construimos el nombre completo y decodificamos entidades HTML
         $nombre_completo = trim($nombre_persona . ' ' . $apellidos_persona);
         $nombre_completo = html_entity_decode($nombre_completo, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Obtener nombre del evento desde el formulario
         $titulo_evento_formulario = '';
         if (isset($request['eventos_2025']) && !empty($request['eventos_2025'][0])) {
             $titulo_evento_formulario = trim(sanitize_text_field($request['eventos_2025'][0]));
@@ -176,11 +188,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             error_log("⚠️ No se recibió el nombre del evento en el formulario (campo eventos_2025)");
         }
 
-        // Decodificar título del evento
         $titulo_a_mostrar = $titulo_evento_encontrado ?: 'Evento no identificado';
         $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // --- GENERACIÓN DE QR DE ALTA CALIDAD ---
+        // --- GENERACIÓN DE QR ---
         $data = "Empresa: {$nombre_empresa}\nNombre: {$nombre_completo}\nCargo: {$cargo_persona}";
         $qr = Builder::create()
             ->writer(new PngWriter())
@@ -194,7 +205,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr->saveToFile($qr_path);
         error_log("🧾 QR generado en: " . $qr_path);
 
-        // --- GENERACIÓN DE PDF CON DISEÑO MEJORADO ---
+        // --- GENERACIÓN DE PDF ---
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
@@ -202,7 +213,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
-        // --- IMAGEN DEL EVENTO ---
         $imagen_insertada = false;
 
         if ($post_id) {
@@ -214,7 +224,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        // Imagen más pequeña sin distorsión: 120mm ancho
                         $pdf->Image($imagen_path, 45, 15, 120, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
                         $imagen_insertada = true;
                         error_log("✅ Imagen destacada insertada sin compresión");
@@ -229,30 +238,21 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        // --- CONTENIDO DEL PDF ---
         $pdf->SetY($imagen_insertada ? 100 : 20);
 
-        // Encabezado
         $pdf->SetFont('helvetica', 'B', 20);
         $pdf->SetTextColor(0, 0, 0);
         $pdf->Cell(0, 12, 'ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(2);
 
-        // Línea separadora discreta
         $pdf->SetDrawColor(0, 0, 0);
         $pdf->SetLineWidth(0.3);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Ln(8);
 
-        // Título del evento
         $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->SetTextColor(0, 0, 0);
         $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(6);
-
-        // Información del participante - sin caja, solo texto
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->SetTextColor(0, 0, 0);
 
         $pdf->SetFont('helvetica', 'B', 11);
         $pdf->Cell(45, 6, 'EMPRESA:', 0, 0);
@@ -271,24 +271,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->Ln(10);
 
-        // Línea separadora
         $pdf->SetDrawColor(0, 0, 0);
         $pdf->SetLineWidth(0.3);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Ln(10);
 
-        // QR Code
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetTextColor(0, 0, 0);
         $pdf->Cell(0, 5, 'Código de escaneo:', 0, 1, 'C');
         $pdf->Ln(3);
 
-        // Posicionar QR centrado - más pequeño y sin distorsión
         $qr_size = 50;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // Guardar PDF con nombre seguro
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
