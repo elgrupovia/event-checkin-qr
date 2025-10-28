@@ -196,106 +196,57 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // --- GENERACIÓN DE PDF CON DISEÑO MEJORADO ---
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
-        $pdf->SetCompression(false); // Desactiva compresión para mejor calidad
-        $pdf->SetImageScale(4); // Mejora la calidad de las imágenes
+        $pdf->SetCompression(false);
+        $pdf->SetImageScale(4);
         $pdf->AddPage();
-        $pdf->SetMargins(10, 10, 10);
-        $pdf->SetAutoPageBreak(true, 10);
-
-        // --- IMAGEN DEL EVENTO CON MEJOR CALIDAD ---
-        $imagen_insertada = false;
-        $y_position = 10;
-
-        if ($post_id) {
-            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-            if ($imagen_url) {
-                $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
-                $imagen_path = $imagen_info['path'];
-                $tmp = $imagen_info['tmp'];
-
-                if (file_exists($imagen_path)) {
-                    try {
-                        // Imagen responsiva: ancho máximo 190mm, altura proporcional
-                        $pdf->Image($imagen_path, 10, $y_position, 190, 75, '', '', 'T', false, 300, '', false, false, 0, false, false, false);
-                        $imagen_insertada = true;
-                        $y_position += 80;
-                        error_log("✅ Imagen destacada insertada con alta calidad");
-                    } catch (Exception $e) {
-                        error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
-                    }
-                } else {
-                    error_log("⚠️ La imagen destacada no se pudo localizar físicamente");
-                }
-
-                if ($tmp && !is_wp_error($tmp) && file_exists($tmp)) {
-                    @unlink($tmp);
-                }
-            } else {
-                error_log("⚠️ El evento ID={$post_id} no tiene imagen destacada");
-            }
-        }
+        $pdf->SetMargins(15, 15, 15);
+        $pdf->SetAutoPageBreak(true, 15);
 
         // --- CONTENIDO DEL PDF ---
-        $pdf->SetY($y_position);
-
         // Encabezado
-        $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->SetTextColor(25, 118, 210); // Azul profesional
-        $pdf->Cell(0, 10, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->SetFont('helvetica', 'B', 20);
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->Ln(4);
+        $pdf->Cell(0, 12, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->Ln(2);
 
-        // Línea separadora
-        $pdf->SetDrawColor(25, 118, 210);
-        $pdf->SetLineWidth(0.5);
-        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
-        $pdf->Ln(5);
+        // Línea separadora discreta
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.3);
+        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
+        $pdf->Ln(8);
 
         // Título del evento
         $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->SetTextColor(40, 40, 40);
-        $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(3);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(6);
 
-        // Línea separadora
-        $pdf->SetDrawColor(200, 200, 200);
-        $pdf->SetLineWidth(0.2);
-        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
-        $pdf->Ln(5);
-
-        // Información del participante con mejor formato
+        // Información del participante - sin caja, solo texto
         $pdf->SetFont('helvetica', '', 11);
-        $pdf->SetTextColor(60, 60, 60);
+        $pdf->SetTextColor(0, 0, 0);
 
-        // Caja de información
-        $pdf->SetFillColor(245, 245, 245);
-        $pdf->SetDrawColor(200, 200, 200);
-        $pdf->SetLineWidth(0.3);
-        $pdf->Rect(10, $pdf->GetY(), 190, 35, 'DF');
-        $pdf->SetY($pdf->GetY() + 3);
-
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetTextColor(25, 118, 210);
-        $pdf->Cell(50, 6, 'EMPRESA:', 0, 0);
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(40, 40, 40);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->Cell(45, 6, 'EMPRESA:', 0, 0);
+        $pdf->SetFont('helvetica', '', 11);
         $pdf->Cell(0, 6, $nombre_empresa, 0, 1);
 
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetTextColor(25, 118, 210);
-        $pdf->Cell(50, 6, 'NOMBRE:', 0, 0);
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(40, 40, 40);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->Cell(45, 6, 'NOMBRE:', 0, 0);
+        $pdf->SetFont('helvetica', '', 11);
         $pdf->Cell(0, 6, $nombre_completo, 0, 1);
 
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetTextColor(25, 118, 210);
-        $pdf->Cell(50, 6, 'CARGO:', 0, 0);
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(40, 40, 40);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->Cell(45, 6, 'CARGO:', 0, 0);
+        $pdf->SetFont('helvetica', '', 11);
         $pdf->Cell(0, 6, $cargo_persona, 0, 1);
 
-        $pdf->Ln(8);
+        $pdf->Ln(10);
+
+        // Línea separadora
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.3);
+        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
+        $pdf->Ln(10);
 
         // QR Code
         $pdf->SetFont('helvetica', 'B', 10);
@@ -322,4 +273,4 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     }
 }
 
-?>
+?> 
