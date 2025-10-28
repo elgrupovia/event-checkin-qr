@@ -210,11 +210,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
         $pdf->AddPage();
-        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
         $imagen_insertada = false;
-        $imagen_altura = 0;
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -225,11 +224,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        // IMAGEN MÁS GRANDE: 170mm de ancho (máximo permitido con márgenes de 10mm)
-                        $imagen_altura = 120;
-                        $pdf->Image($imagen_path, 20, 10, 170, $imagen_altura, '', '', '', true, 300, '', false, false, 0, false, false, false);
+                        // IMAGEN AMPLIADA: 140mm de ancho
+                        $pdf->Image($imagen_path, 35, 15, 140, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
                         $imagen_insertada = true;
-                        error_log("✅ Imagen destacada insertada sin compresión - Tamaño: 170x120mm");
+                        error_log("✅ Imagen destacada insertada sin compresión");
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
                     }
@@ -242,7 +240,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         // Posición después de la imagen
-        $pdf->SetY($imagen_insertada ? (10 + $imagen_altura + 5) : 20);
+        $pdf->SetY($imagen_insertada ? 105 : 20);
 
         $pdf->SetFont('helvetica', 'B', 18);
         $pdf->SetTextColor(0, 0, 0);
