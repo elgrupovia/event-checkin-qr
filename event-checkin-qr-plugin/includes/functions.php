@@ -301,22 +301,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             $pdf->Ln(3);
         }
 
-        // --- DATOS DEL ASISTENTE ---
+        // --- DATOS DEL ASISTENTE (COMPACTO) ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(45, 6, 'EMPRESA:', 0, 0);
+        $pdf->Cell(30, 5, 'Empresa:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 6, $nombre_empresa, 0, 1);
+        $pdf->Cell(0, 5, $nombre_empresa, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(45, 6, 'NOMBRE:', 0, 0);
+        $pdf->Cell(30, 5, 'Nombre:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 6, $nombre_completo, 0, 1);
+        $pdf->Cell(0, 5, $nombre_completo, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(45, 6, 'CARGO:', 0, 0);
+        $pdf->Cell(30, 5, 'Cargo:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 6, $cargo_persona, 0, 1);
+        $pdf->Cell(0, 5, $cargo_persona, 0, 1);
 
         $pdf->Ln(8);
 
