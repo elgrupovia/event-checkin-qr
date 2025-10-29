@@ -326,7 +326,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(3);
 
-        $qr_size = 80;
+        $qr_size = 120;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
