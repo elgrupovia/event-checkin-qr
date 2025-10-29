@@ -5,6 +5,7 @@
  * ✅ Búsqueda mejorada con normalización de texto y múltiples estrategias
  * ✅ Imagen de ALTA CALIDAD y TAMAÑO GRANDE
  * ✅ Logo en cabecera y lugar del evento visible
+ * ✅ DISEÑO RESPONSIVE - Imagen más grande con mejor distribución
  */
 
 if (!defined('ABSPATH')) {
@@ -145,7 +146,7 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir) {
 }
 
 /**
- * Función principal: genera el PDF con QR + logo + imagen del evento
+ * Función principal: genera el PDF con QR + logo + imagen del evento (DISEÑO MEJORADO)
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
@@ -211,14 +212,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
         $pdf->AddPage();
-        $pdf->SetMargins(15, 15, 15);
-        $pdf->SetAutoPageBreak(true, 15);
+        $pdf->SetMargins(12, 12, 12);
+        $pdf->SetAutoPageBreak(true, 12);
 
-        // --- INSERTAR LOGO EN CABECERA ---
+        // --- INSERTAR LOGO EN CABECERA (más pequeño) ---
         $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
         if (file_exists($logo_path)) {
             try {
-                $pdf->Image($logo_path, 85, 10, 40, '', 'JPG', '', 'T', false, 300);
+                $pdf->Image($logo_path, 85, 8, 35, '', 'JPG', '', 'T', false, 300);
                 error_log("✅ Logo insertado correctamente en cabecera: " . $logo_path);
             } catch (Exception $e) {
                 error_log("❌ Error al insertar logo: " . $e->getMessage());
@@ -227,10 +228,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             error_log("⚠️ Logo no encontrado en: " . $logo_path);
         }
 
-        $pdf->SetY(35);
+        $pdf->SetY(32);
 
-
+        // --- INSERTAR IMAGEN DEL EVENTO (MÁS GRANDE) ---
         $imagen_insertada = false;
+        $altura_imagen = 0;
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -241,9 +243,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        $pdf->Image($imagen_path, 35, 45, 140, '', '', '', 'T', false, 300);
+                        // Imagen más grande: ancho 170mm (casi todo el ancho disponible)
+                        $pdf->Image($imagen_path, 20, 32, 170, '', '', '', 'T', false, 300);
                         $imagen_insertada = true;
-                        error_log("✅ Imagen destacada insertada sin compresión");
+                        $altura_imagen = 110; // Aproximadamente la altura que ocupará
+                        error_log("✅ Imagen destacada insertada sin compresión - Tamaño grande");
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
                     }
@@ -255,15 +259,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        $pdf->SetY($imagen_insertada ? 120 : 60);
+        // --- POSICIÓN DE CONTENIDO BASADA EN SI HAY IMAGEN ---
+        $pdf->SetY($imagen_insertada ? 145 : 50);
 
-        $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->Cell(0, 10, 'ENTRADA CONFIRMADA', 0, 1, 'C');
-        $pdf->Ln(4);
-
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
+        // --- TÍTULO: "ENTRADA CONFIRMADA" ---
+        $pdf->SetFont('helvetica', 'B', 20);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->Cell(0, 12, 'ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(3);
+
+        // --- NOMBRE DEL EVENTO ---
+        $pdf->SetFont('helvetica', 'B', 13);
+        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(2);
 
         // --- MOSTRAR CIUDAD / LUGAR ---
         $ciudad = '';
@@ -273,38 +281,42 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         if (!empty($ciudad)) {
-            $pdf->SetFont('helvetica', '', 10);
-            $pdf->SetTextColor(80, 80, 80);
-            $pdf->MultiCell(0, 6, 'Lugar: ' . $ciudad, 0, 'C');
-            $pdf->Ln(6);
+            $pdf->SetFont('helvetica', '', 11);
+            $pdf->SetTextColor(100, 100, 100);
+            $pdf->MultiCell(0, 6, '📍 ' . $ciudad, 0, 'C');
+            $pdf->Ln(4);
         }
 
+        // --- DATOS DEL ASISTENTE ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(40, 5, 'EMPRESA:', 0, 0);
+        $pdf->Cell(45, 6, 'EMPRESA:', 0, 0);
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $nombre_empresa, 0, 1);
+        $pdf->Cell(0, 6, $nombre_empresa, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(40, 5, 'NOMBRE:', 0, 0);
+        $pdf->Cell(45, 6, 'NOMBRE:', 0, 0);
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $nombre_completo, 0, 1);
+        $pdf->Cell(0, 6, $nombre_completo, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(40, 5, 'CARGO:', 0, 0);
+        $pdf->Cell(45, 6, 'CARGO:', 0, 0);
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $cargo_persona, 0, 1);
+        $pdf->Cell(0, 6, $cargo_persona, 0, 1);
 
-        $pdf->Ln(10);
+        $pdf->Ln(8);
 
+        // --- CÓDIGO QR ---
         $pdf->SetFont('helvetica', 'B', 9);
-        $pdf->Cell(0, 4, 'Código de escaneo:', 0, 1, 'C');
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(2);
 
-        $qr_size = 55;
+        $qr_size = 50;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
+        // --- GENERAR Y GUARDAR PDF ---
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
