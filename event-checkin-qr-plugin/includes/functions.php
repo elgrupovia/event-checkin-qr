@@ -248,7 +248,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 if (file_exists($imagen_path)) {
                     try {
                         // Imagen más grande y centrada
-                        $pdf->Image($imagen_path, 20, 30, 170, '', '', '', 'T', false, 300);
+                        $pdf->Image($imagen_path, 20, 30, 150, '', '', '', 'T', false, 300);
                         $imagen_insertada = true;
                         error_log("✅ Imagen destacada insertada sin compresión - Tamaño grande");
                     } catch (Exception $e) {
@@ -263,7 +263,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         // --- POSICIÓN DE CONTENIDO (más aire debajo de imagen) ---
-        $pdf->SetY($imagen_insertada ? 130 : 60);
+        $pdf->SetY($imagen_insertada ? 115 : 60);
 
         // --- TÍTULO: "ENTRADA CONFIRMADA" ---
         $pdf->SetFont('helvetica', 'B', 22);
@@ -293,9 +293,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             $pdf->MultiCell(0, 5, htmlspecialchars($fecha_evento, ENT_QUOTES, 'UTF-8'), 0, 'C');
         }
 
-        if (!empty($ubicacion) || !empty($fecha_evento)) {
-            $pdf->Ln(10);
-        }
+        $pdf->Ln(10);
 
         // --- DATOS DEL ASISTENTE ---
         $pdf->SetTextColor(0, 0, 0);
@@ -307,7 +305,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
         $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
 
-        $pdf->Ln(12);
+        $pdf->Ln(8);
 
         // --- CÓDIGO QR (MÁS GRANDE Y DEBAJO) ---
         $pdf->SetFont('helvetica', 'B', 9);
@@ -315,7 +313,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(4);
 
-        $qr_size = 80;  // Tamaño del QR aumentado de 50 a 80
+        $qr_size = 65;  // Tamaño del QR ajustado para evitar salto de página
         $qr_x = (210 - $qr_size) / 2;  // Centrado en la página
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
