@@ -211,11 +211,17 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
-        $pdf->AddPage();
-        $pdf->SetMargins(12, 12, 12);
-        $pdf->SetAutoPageBreak(true, 12);
 
-        // --- INSERTAR LOGO EN CABECERA (más pequeño) ---
+        // 🧹 ELIMINAR CABECERA Y PIE DE PÁGINA
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+
+        // 🧾 Configurar márgenes más amplios
+        $pdf->SetMargins(12, 20, 12);
+        $pdf->SetAutoPageBreak(true, 12);
+        $pdf->AddPage();
+
+        // --- INSERTAR LOGO EN CABECERA ---
         $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
         if (file_exists($logo_path)) {
             try {
@@ -228,9 +234,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             error_log("⚠️ Logo no encontrado en: " . $logo_path);
         }
 
-        // --- INSERTAR IMAGEN DEL EVENTO (MÁS GRANDE) ---
+        // --- INSERTAR IMAGEN DEL EVENTO ---
         $imagen_insertada = false;
-        $altura_imagen = 0;
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -241,10 +246,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        // Imagen más grande: ancho 170mm (casi todo el ancho disponible)
-                        $pdf->Image($imagen_path, 20, 32, 170, '', '', '', 'T', false, 300);
+                        // Imagen más grande y centrada
+                        $pdf->Image($imagen_path, 20, 30, 170, '', '', '', 'T', false, 300);
                         $imagen_insertada = true;
-                        $altura_imagen = 110; // Aproximadamente la altura que ocupará
                         error_log("✅ Imagen destacada insertada sin compresión - Tamaño grande");
                     } catch (Exception $e) {
                         error_log("❌ Error al insertar imagen en PDF: " . $e->getMessage());
@@ -257,29 +261,23 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        // --- POSICIÓN DE CONTENIDO BASADA EN SI HAY IMAGEN ---
-        $pdf->SetY($imagen_insertada ? 125 : 50);
+        // --- POSICIÓN DE CONTENIDO (más aire debajo de imagen) ---
+        $pdf->SetY($imagen_insertada ? 145 : 60);
 
         // --- TÍTULO: "ENTRADA CONFIRMADA" ---
-        $pdf->SetFont('helvetica', 'B', 20);
+        $pdf->SetFont('helvetica', 'B', 22);
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->Cell(0, 12, 'ENTRADA CONFIRMADA', 0, 1, 'C');
-        $pdf->Ln(3);
+        $pdf->Cell(0, 14, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->Ln(8);
 
         // --- NOMBRE DEL EVENTO ---
         $pdf->SetFont('helvetica', 'B', 13);
         $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(2);
+        $pdf->Ln(5);
 
-        // --- MOSTRAR UBICACIÓN Y FECHA (SIN EMOJIS, PROFESIONAL) ---
-        
-        // Extraer ubicación con nombre de campo exacto: "ubicacion-evento"
+        // --- UBICACIÓN Y FECHA ---
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true);
-        
-        // Extraer fecha con nombre de campo exacto: "fecha"
         $fecha_evento = get_post_meta($post_id, 'fecha', true);
-
-        // Si la fecha tiene formato de timestamp, convertir a formato legible
         if (is_numeric($fecha_evento)) {
             $fecha_evento = date('d/m/Y H:i', $fecha_evento);
         }
@@ -290,16 +288,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         if (!empty($ubicacion)) {
             $pdf->MultiCell(0, 5, htmlspecialchars($ubicacion, ENT_QUOTES, 'UTF-8'), 0, 'C');
         }
-
         if (!empty($fecha_evento)) {
             $pdf->MultiCell(0, 5, htmlspecialchars($fecha_evento, ENT_QUOTES, 'UTF-8'), 0, 'C');
         }
 
         if (!empty($ubicacion) || !empty($fecha_evento)) {
-            $pdf->Ln(3);
+            $pdf->Ln(10); // más aire antes de datos del asistente
         }
 
-        // --- DATOS DEL ASISTENTE (COMPACTO - ALINEADO A LA DERECHA) ---
+        // --- DATOS DEL ASISTENTE ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(60, 5, 'Empresa:', 0, 0, 'R');
@@ -316,19 +313,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $cargo_persona, 0, 1);
 
-        $pdf->Ln(8);
+        $pdf->Ln(10);
 
         // --- CÓDIGO QR ---
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(80, 80, 80);
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
-        $pdf->Ln(2);
+        $pdf->Ln(3);
 
         $qr_size = 50;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // --- GENERAR Y GUARDAR PDF ---
+        // --- GUARDAR PDF ---
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
@@ -341,4 +338,5 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         error_log("❌ Stack trace: " . $e->getTraceAsString());
     }
 }
+
 ?>
