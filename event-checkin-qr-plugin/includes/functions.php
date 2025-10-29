@@ -273,18 +273,41 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
 
-        // --- MOSTRAR CIUDAD / LUGAR ---
+        // --- MOSTRAR CIUDAD / LUGAR, UBICACIÓN Y FECHA ---
         $ciudad = '';
         $ciudades = wp_get_post_terms($post_id, 'ciudades');
         if (!empty($ciudades) && !is_wp_error($ciudades)) {
             $ciudad = $ciudades[0]->name;
         }
 
+        // Extraer ubicación con nombre de campo exacto: "ubicacion-evento"
+        $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true);
+        
+        // Extraer fecha con nombre de campo exacto: "fecha"
+        $fecha_evento = get_post_meta($post_id, 'fecha', true);
+
+        // Si la fecha tiene formato de timestamp, convertir a formato legible
+        if (is_numeric($fecha_evento)) {
+            $fecha_evento = date('d/m/Y H:i', $fecha_evento);
+        }
+
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->SetTextColor(100, 100, 100);
+
         if (!empty($ciudad)) {
-            $pdf->SetFont('helvetica', '', 11);
-            $pdf->SetTextColor(100, 100, 100);
-            $pdf->MultiCell(0, 6, '📍 ' . $ciudad, 0, 'C');
-            $pdf->Ln(4);
+            $pdf->MultiCell(0, 5, '📍 ' . $ciudad, 0, 'C');
+        }
+
+        if (!empty($ubicacion)) {
+            $pdf->MultiCell(0, 5, '📍 ' . htmlspecialchars($ubicacion, ENT_QUOTES, 'UTF-8'), 0, 'C');
+        }
+
+        if (!empty($fecha_evento)) {
+            $pdf->MultiCell(0, 5, '📅 ' . htmlspecialchars($fecha_evento, ENT_QUOTES, 'UTF-8'), 0, 'C');
+        }
+
+        if (!empty($ciudad) || !empty($ubicacion) || !empty($fecha_evento)) {
+            $pdf->Ln(2);
         }
 
         // --- DATOS DEL ASISTENTE ---
