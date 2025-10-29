@@ -228,8 +228,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             error_log("⚠️ Logo no encontrado en: " . $logo_path);
         }
 
-        $pdf->SetY(32);
-
         // --- INSERTAR IMAGEN DEL EVENTO (MÁS GRANDE) ---
         $imagen_insertada = false;
         $altura_imagen = 0;
@@ -260,7 +258,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         // --- POSICIÓN DE CONTENIDO BASADA EN SI HAY IMAGEN ---
-        $pdf->SetY($imagen_insertada ? 145 : 50);
+        $pdf->SetY($imagen_insertada ? 125 : 50);
 
         // --- TÍTULO: "ENTRADA CONFIRMADA" ---
         $pdf->SetFont('helvetica', 'B', 20);
@@ -301,20 +299,20 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             $pdf->Ln(3);
         }
 
-        // --- DATOS DEL ASISTENTE (COMPACTO) ---
+        // --- DATOS DEL ASISTENTE (COMPACTO - ALINEADO A LA DERECHA) ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(30, 5, 'Empresa:', 0, 0, 'R');
+        $pdf->Cell(60, 5, 'Empresa:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $nombre_empresa, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(30, 5, 'Nombre:', 0, 0, 'R');
+        $pdf->Cell(60, 5, 'Nombre:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $nombre_completo, 0, 1);
 
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(30, 5, 'Cargo:', 0, 0, 'R');
+        $pdf->Cell(60, 5, 'Cargo:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $cargo_persona, 0, 1);
 
