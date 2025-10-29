@@ -302,11 +302,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(2);
 
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetX(80);  // Posiciona los datos a la derecha
+        $pdf->SetX(35);  // Posiciona los datos a la derecha
         $pdf->MultiCell(0, 6, "Empresa: " . $nombre_empresa, 0, 'L');
-        $pdf->SetX(80);
+        $pdf->SetX(35);
         $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
-        $pdf->SetX(80);
+        $pdf->SetX(35);
         $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
 
         $pdf->Ln(8);
