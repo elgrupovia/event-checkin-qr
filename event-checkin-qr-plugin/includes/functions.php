@@ -248,7 +248,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 if (file_exists($imagen_path)) {
                     try {
                         // Imagen más grande y centrada
-                        $pdf->Image($imagen_path, 20, 30, 150, '', '', '', 'T', false, 300);
+                        $imagen_x = (210 - 150) / 2;  // Centrado en página A4 (210mm)
+                        $pdf->Image($imagen_path, $imagen_x, 30, 150, '', '', '', 'T', false, 300);
                         $imagen_insertada = true;
                         error_log("✅ Imagen destacada insertada sin compresión - Tamaño grande");
                     } catch (Exception $e) {
@@ -301,8 +302,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(2);
 
         $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetX(130);  // Posiciona los datos a la derecha
         $pdf->MultiCell(0, 6, "Empresa: " . $nombre_empresa, 0, 'L');
+        $pdf->SetX(130);
         $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
+        $pdf->SetX(130);
         $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
 
         $pdf->Ln(8);
