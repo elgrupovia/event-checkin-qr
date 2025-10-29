@@ -302,22 +302,20 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(0, 0, 0);
 
         if ($imagen_insertada) {
-            $datos_x = 20 + 170 + 5; // X de la imagen + ancho + margen
+            $datos_x = 20 + 170 + 10; // +10 en vez de +5 para mover más a la derecha
             $datos_y = 30;            // misma Y que la imagen
-            $datos_width = 210 - $datos_x - 12; // ancho restante de la página (A4 ancho=210mm, margen derecho=12mm)
+            $datos_width = 210 - $datos_x - 12; // ancho restante
         } else {
             $datos_x = 12;
             $datos_y = $pdf->GetY();
             $datos_width = 210 - 24; // margen izquierdo y derecho
         }
 
+
         $pdf->SetXY($datos_x, $datos_y);
         $pdf->MultiCell($datos_width, 6, "Empresa: " . $nombre_empresa, 0, 'L');
         $pdf->MultiCell($datos_width, 6, "Nombre: " . $nombre_completo, 0, 'L');
         $pdf->MultiCell($datos_width, 6, "Cargo: " . $cargo_persona, 0, 'L');
-
-
-    
 
 
         // --- CÓDIGO QR ---
@@ -326,7 +324,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(3);
 
-        $qr_size = 120;
+        $qr_size = 90;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
