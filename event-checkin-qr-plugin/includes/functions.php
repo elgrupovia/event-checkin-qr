@@ -302,9 +302,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(0, 0, 0);
 
         if ($imagen_insertada) {
-            $datos_x = 20 + 170 + 10; // +10 en vez de +5 para mover más a la derecha
+            // Imagen está en X=20 con ancho=170, termina en 190
+            // Margen derecho = 12, ancho total página = 210
+            // Datos empiezan después de la imagen + pequeño espacio
+            $datos_x = 125;           // Posición X más a la derecha
             $datos_y = 30;            // misma Y que la imagen
-            $datos_width = 210 - $datos_x - 12; // ancho restante
+            $datos_width = 73;        // Ancho para los datos (210 - 125 - 12)
         } else {
             $datos_x = 12;
             $datos_y = $pdf->GetY();
