@@ -6,6 +6,7 @@
  * ✅ Imagen de ALTA CALIDAD y TAMAÑO GRANDE
  * ✅ Logo en cabecera y lugar del evento visible
  * ✅ DISEÑO RESPONSIVE - Imagen más grande con mejor distribución
+ * ✅ QR AMPLIADO y datos del asistente a la derecha
  */
 
 if (!defined('ABSPATH')) {
@@ -293,43 +294,45 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         if (!empty($ubicacion) || !empty($fecha_evento)) {
-            $pdf->Ln(10); // más aire antes de datos del asistente
+            $pdf->Ln(10);
         }
 
-
-        // --- DATOS DEL ASISTENTE A LA DERECHA DE LA IMAGEN ---
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(0, 0, 0);
-
-        if ($imagen_insertada) {
-            // Imagen está en X=20 con ancho=170, termina en 190
-            // Margen derecho = 12, ancho total página = 210
-            // Datos empiezan después de la imagen + pequeño espacio
-            $datos_x = 125;           // Posición X más a la derecha
-            $datos_y = 30;            // misma Y que la imagen
-            $datos_width = 73;        // Ancho para los datos (210 - 125 - 12)
-        } else {
-            $datos_x = 12;
-            $datos_y = $pdf->GetY();
-            $datos_width = 210 - 24; // margen izquierdo y derecho
-        }
-
-
-        $pdf->SetXY($datos_x, $datos_y);
-        $pdf->MultiCell($datos_width, 6, "Empresa: " . $nombre_empresa, 0, 'L');
-        $pdf->MultiCell($datos_width, 6, "Nombre: " . $nombre_completo, 0, 'L');
-        $pdf->MultiCell($datos_width, 6, "Cargo: " . $cargo_persona, 0, 'L');
-
-
-        // --- CÓDIGO QR ---
+        // --- DISEÑO DE DOS COLUMNAS: QR A LA IZQUIERDA, DATOS A LA DERECHA ---
+        $current_y = $pdf->GetY();
+        
+        // COLUMNA IZQUIERDA: QR MÁS GRANDE
+        $qr_size = 70; // QR más grande
+        $qr_x = 15;
+        $qr_y = $current_y;
+        
+        // COLUMNA DERECHA: DATOS DEL ASISTENTE
+        $datos_x = 105; // Más a la derecha
+        $datos_y = $current_y;
+        
+        // --- INSERTAR QR GRANDE ---
+        $pdf->SetY($qr_y);
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(80, 80, 80);
-        $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
-        $pdf->Ln(3);
-
-        $qr_size = 90;
-        $qr_x = (210 - $qr_size) / 2;
-        $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $pdf->SetXY($qr_x, $qr_y - 5);
+        $pdf->Cell(70, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
+        
+        $pdf->Image($qr_path, $qr_x + 5, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        
+        // --- DATOS DEL ASISTENTE A LA DERECHA ---
+        $pdf->SetXY($datos_x, $datos_y);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->Cell(0, 6, 'Datos del asistente:', 0, 1, 'L');
+        
+        $pdf->SetXY($datos_x, $pdf->GetY() + 3);
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->MultiCell(0, 6, "Empresa:\n" . $nombre_empresa, 0, 'L');
+        
+        $pdf->SetXY($datos_x, $pdf->GetY() + 2);
+        $pdf->MultiCell(0, 6, "Nombre:\n" . $nombre_completo, 0, 'L');
+        
+        $pdf->SetXY($datos_x, $pdf->GetY() + 2);
+        $pdf->MultiCell(0, 6, "Cargo:\n" . $cargo_persona, 0, 'L');
 
         // --- GUARDAR PDF ---
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
