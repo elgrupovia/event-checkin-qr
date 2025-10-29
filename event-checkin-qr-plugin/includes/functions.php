@@ -262,7 +262,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         // --- POSICIÓN DE CONTENIDO (más aire debajo de imagen) ---
-        $pdf->SetY($imagen_insertada ? 145 : 60);
+        $pdf->SetY($imagen_insertada ? 130 : 60);
 
         // --- TÍTULO: "ENTRADA CONFIRMADA" ---
         $pdf->SetFont('helvetica', 'B', 22);
@@ -296,24 +296,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             $pdf->Ln(10); // más aire antes de datos del asistente
         }
 
+
         // --- DATOS DEL ASISTENTE ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(60, 5, 'Empresa:', 0, 0, 'R');
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $nombre_empresa, 0, 1);
+        //$pdf->Cell(0, 6, 'Datos del asistente:', 0, 1, 'L');
+        $pdf->Ln(2);
 
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(60, 5, 'Nombre:', 0, 0, 'R');
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $nombre_completo, 0, 1);
-
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->Cell(60, 5, 'Cargo:', 0, 0, 'R');
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Cell(0, 5, $cargo_persona, 0, 1);
+        $pdf->MultiCell(0, 6, "Empresa: " . $nombre_empresa, 0, 'L');
+        $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
+        $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
 
         $pdf->Ln(10);
+
+    
+
 
         // --- CÓDIGO QR ---
         $pdf->SetFont('helvetica', 'B', 9);
