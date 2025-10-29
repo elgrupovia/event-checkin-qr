@@ -297,18 +297,25 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
 
-        // --- DATOS DEL ASISTENTE ---
-        $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('helvetica', 'B', 10);
-        //$pdf->Cell(0, 6, 'Datos del asistente:', 0, 1, 'L');
-        $pdf->Ln(2);
-
+        // --- DATOS DEL ASISTENTE A LA DERECHA DE LA IMAGEN ---
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->MultiCell(0, 6, "Empresa: " . $nombre_empresa, 0, 'L');
-        $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
-        $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
+        $pdf->SetTextColor(0, 0, 0);
 
-        $pdf->Ln(10);
+        if ($imagen_insertada) {
+            $datos_x = 20 + 170 + 5; // X de la imagen + ancho + margen
+            $datos_y = 30;            // misma Y que la imagen
+            $datos_width = 210 - $datos_x - 12; // ancho restante de la página (A4 ancho=210mm, margen derecho=12mm)
+        } else {
+            $datos_x = 12;
+            $datos_y = $pdf->GetY();
+            $datos_width = 210 - 24; // margen izquierdo y derecho
+        }
+
+        $pdf->SetXY($datos_x, $datos_y);
+        $pdf->MultiCell($datos_width, 6, "Empresa: " . $nombre_empresa, 0, 'L');
+        $pdf->MultiCell($datos_width, 6, "Nombre: " . $nombre_completo, 0, 'L');
+        $pdf->MultiCell($datos_width, 6, "Cargo: " . $cargo_persona, 0, 'L');
+
 
     
 
@@ -319,7 +326,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(3);
 
-        $qr_size = 50;
+        $qr_size = 80;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
