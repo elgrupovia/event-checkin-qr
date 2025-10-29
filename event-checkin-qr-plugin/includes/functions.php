@@ -3,7 +3,8 @@
  * functions.php — Plugin Event Check-In QR
  * Genera un PDF con código QR personalizado al ejecutar el hook JetFormBuilder "inscripciones_qr"
  * ✅ Búsqueda mejorada con normalización de texto y múltiples estrategias
- * ✅ Imagen de ALTA CALIDAD y TAMAÑO GRANDE, responsive y diseño profesional mejorado
+ * ✅ Imagen de ALTA CALIDAD y TAMAÑO GRANDE
+ * ✅ Logo en cabecera y lugar del evento visible
  */
 
 if (!defined('ABSPATH')) {
@@ -144,7 +145,7 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir) {
 }
 
 /**
- * Función principal: genera el PDF con QR + imagen del evento
+ * Función principal: genera el PDF con QR + logo + imagen del evento
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
@@ -213,6 +214,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 15);
 
+        // --- INSERTAR LOGO EN CABECERA ---
+        $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
+        if (file_exists($logo_path)) {
+            try {
+                $pdf->Image($logo_path, 85, 10, 40, '', 'JPG', '', 'T', false, 300);
+                error_log("✅ Logo insertado correctamente en cabecera: " . $logo_path);
+            } catch (Exception $e) {
+                error_log("❌ Error al insertar logo: " . $e->getMessage());
+            }
+        } else {
+            error_log("⚠️ Logo no encontrado en: " . $logo_path);
+        }
+
+        $pdf->SetY(35);
+
+
         $imagen_insertada = false;
 
         if ($post_id) {
@@ -224,8 +241,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
                 if (file_exists($imagen_path)) {
                     try {
-                        // IMAGEN AMPLIADA: 140mm de ancho
-                        $pdf->Image($imagen_path, 35, 15, 140, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+                        $pdf->Image($imagen_path, 35, 45, 140, '', '', '', 'T', false, 300);
                         $imagen_insertada = true;
                         error_log("✅ Imagen destacada insertada sin compresión");
                     } catch (Exception $e) {
@@ -239,23 +255,31 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        // Posición después de la imagen
-        $pdf->SetY($imagen_insertada ? 105 : 20);
+        $pdf->SetY($imagen_insertada ? 120 : 60);
 
         $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->SetTextColor(0, 0, 0);
         $pdf->Cell(0, 10, 'ENTRADA CONFIRMADA', 0, 1, 'C');
-        $pdf->Ln(2);
-
-        $pdf->SetDrawColor(0, 0, 0);
-        $pdf->SetLineWidth(0.5);
-        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
-        $pdf->Ln(6);
+        $pdf->Ln(4);
 
         $pdf->SetFont('helvetica', 'B', 12);
         $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(4);
+        $pdf->Ln(3);
 
+        // --- MOSTRAR CIUDAD / LUGAR ---
+        $ciudad = '';
+        $ciudades = wp_get_post_terms($post_id, 'ciudades');
+        if (!empty($ciudades) && !is_wp_error($ciudades)) {
+            $ciudad = $ciudades[0]->name;
+        }
+
+        if (!empty($ciudad)) {
+            $pdf->SetFont('helvetica', '', 10);
+            $pdf->SetTextColor(80, 80, 80);
+            $pdf->MultiCell(0, 6, 'Lugar: ' . $ciudad, 0, 'C');
+            $pdf->Ln(6);
+        }
+
+        $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(40, 5, 'EMPRESA:', 0, 0);
         $pdf->SetFont('helvetica', '', 10);
@@ -271,12 +295,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $cargo_persona, 0, 1);
 
-        $pdf->Ln(8);
-
-        $pdf->SetDrawColor(0, 0, 0);
-        $pdf->SetLineWidth(0.5);
-        $pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
-        $pdf->Ln(8);
+        $pdf->Ln(10);
 
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->Cell(0, 4, 'Código de escaneo:', 0, 1, 'C');
@@ -298,5 +317,4 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         error_log("❌ Stack trace: " . $e->getTraceAsString());
     }
 }
-
 ?>
