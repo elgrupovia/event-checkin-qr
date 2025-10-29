@@ -189,17 +189,21 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $ubicacion = $ubicacion ?: 'Ubicación no disponible';
         $fecha     = $fecha_evento ?: 'Fecha no especificada';
 
+        
         $params = [
-            'empresa'   => $empresa,
-            'nombre'    => $nombre,
-            'cargo'     => $cargo,
-            'evento'    => $evento,
-            'ubicacion' => $ubicacion,
-            'fecha'     => $fecha,
+            'empresa'   => rawurlencode($empresa),
+            'nombre'    => rawurlencode($nombre),
+            'cargo'     => rawurlencode($cargo),
+            'evento'    => rawurlencode($evento),
+            'ubicacion' => rawurlencode($ubicacion),
+            'fecha'     => rawurlencode($fecha),
         ];
 
-        $query_string = http_build_query($params);
+        
+        $query_string = implode('&', array_map(fn($k, $v) => "{$k}={$v}", array_keys($params), $params));
         $qr_url = $base_url . '?' . $query_string;
+
+
         error_log("🌐 URL generada para QR: " . $qr_url);
 
         $qr = Builder::create()
