@@ -263,12 +263,27 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(10);
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', '', 10);
+
+        // Empresa
         $pdf->SetX(35);
-        $pdf->MultiCell(0, 6, "Empresa: " . $nombre_empresa, 0, 'L');
+        $pdf->Write(6, "Empresa: ");
+        $pdf->SetFont('helvetica', 'B', 10); // Negrita solo para el valor
+        $pdf->MultiCell(0, 6, $nombre_empresa, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10); // Vuelve a normal
+
+        // Nombre
         $pdf->SetX(35);
-        $pdf->MultiCell(0, 6, "Nombre: " . $nombre_completo, 0, 'L');
+        $pdf->Write(6, "Nombre: ");
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, $nombre_completo, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+
+        // Cargo
         $pdf->SetX(35);
-        $pdf->MultiCell(0, 6, "Cargo: " . $cargo_persona, 0, 'L');
+        $pdf->Write(6, "Cargo: ");
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, $cargo_persona, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
 
         $pdf->Ln(8);
         $pdf->SetFont('helvetica', 'B', 9);
