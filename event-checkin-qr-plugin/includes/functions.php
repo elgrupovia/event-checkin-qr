@@ -306,4 +306,66 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         error_log("❌ Error al generar PDF: " . $e->getMessage());
     }
 }
+/**
+ * ---------------------------
+ * Registrar QR leídos
+ * ---------------------------
+ */
+add_action('template_redirect', function() {
+    if (strpos($_SERVER['REQUEST_URI'], '/checkin/') !== false) {
+        $nombre   = sanitize_text_field($_GET['nombre'] ?? 'Invitado');
+        $empresa  = sanitize_text_field($_GET['empresa'] ?? '');
+        $cargo    = sanitize_text_field($_GET['cargo'] ?? '');
+        $evento   = sanitize_text_field($_GET['evento'] ?? '');
+
+        $post_id = buscar_evento_robusto($evento);
+        if ($post_id) {
+            $asistentes = get_post_meta($post_id, '_asistentes', true);
+            if (!is_array($asistentes)) $asistentes = [];
+            $asistentes[] = [
+                'nombre' => $nombre,
+                'empresa' => $empresa,
+                'cargo' => $cargo,
+                'fecha_hora' => current_time('mysql')
+            ];
+            update_post_meta($post_id, '_asistentes', $asistentes);
+        }
+
+        echo "<h2>Check-in confirmado</h2>";
+        echo "<p>Bienvenido: <strong>{$nombre}</strong></p>";
+        exit;
+    }
+});
+
+/**
+ * ---------------------------
+ * Admin: Apartado Asistentes
+ * ---------------------------
+ */
+add_action('admin_menu', function() {
+    add_submenu_page(
+        'edit.php?post_type=eventos',
+        'Asistentes',
+        'Asistentes',
+        'manage_options',
+        'eventos-asistentes',
+        function() {
+            $eventos = get_posts(['post_type'=>'eventos','numberposts'=>-1]);
+            echo '<h1>Asistentes por Evento</h1>';
+            foreach($eventos as $e) {
+                echo '<h2>'.get_the_title($e->ID).'</h2>';
+                $asistentes = get_post_meta($e->ID,'_asistentes',true);
+                if($asistentes){
+                    echo '<ul>';
+                    foreach($asistentes as $a){
+                        echo '<li>'.esc_html($a['nombre']).' ('.esc_html($a['empresa']).') - '.esc_html($a['fecha_hora']).'</li>';
+                    }
+                    echo '</ul>';
+                } else {
+                    echo '<p>No hay asistentes registrados.</p>';
+                }
+            }
+        }
+    );
+});
 ?>
