@@ -11,17 +11,27 @@ $client_id = '1000.KB3EVPYRNDSJ2REYPBDAOYH6L9F71N';
 $client_secret = '79639bdd17caaaff397ed4714e1b1812fbfe95dda8';
 $redirect_uri = 'https://www.grupovia.net/oauth_redirect.php';
 
-function getDatabaseConnection() {
-    global $db_host, $db_user, $db_password, $db_name;
-    $mysqli = new mysqli($db_host, $db_user, $db_password, $db_name);
+/**
+ * Conexión a la base de datos
+ * (Evita conflicto si ya existe en otro archivo del tema)
+ */
+if (!function_exists('getDatabaseConnection')) {
+    function getDatabaseConnection() {
+        global $db_host, $db_user, $db_password, $db_name;
+        $mysqli = new mysqli($db_host, $db_user, $db_password, $db_name);
 
-    if ($mysqli->connect_error) {
-        die("Error de conexión: " . $mysqli->connect_error);
+        if ($mysqli->connect_error) {
+            error_log("❌ Error de conexión a la BD (Zoho config.php): " . $mysqli->connect_error);
+            die("Error de conexión: " . $mysqli->connect_error);
+        }
+
+        return $mysqli;
     }
-
-    return $mysqli;
 }
 
+/**
+ * Obtener el token de acceso actual (o renovarlo si ha expirado)
+ */
 function getAccessToken() {
     $mysqli = getDatabaseConnection();
     $query = "SELECT access_token, refresh_token, expires_in, created_at FROM oauth_tokens ORDER BY created_at DESC LIMIT 1";
@@ -34,17 +44,21 @@ function getAccessToken() {
 
         // Verificar si el token ha expirado
         if ((time() - $created_at) > $expires_in) {
-            // El token ha expirado, renovarlo
+            error_log("🔄 Token Zoho expirado, renovando...");
             $new_token_data = refreshAccessToken($row['refresh_token']);
             return $new_token_data['access_token'];
         } else {
             return $row['access_token'];
         }
     } else {
+        error_log("⚠️ No se encontró un token de acceso válido en la base de datos.");
         die("No se encontró un token de acceso válido.");
     }
 }
 
+/**
+ * Renovar el token de acceso con el refresh token
+ */
 function refreshAccessToken($refresh_token) {
     global $client_id, $client_secret, $redirect_uri;
 
@@ -67,6 +81,7 @@ function refreshAccessToken($refresh_token) {
     curl_close($curl);
 
     if ($err) {
+        error_log("❌ cURL Error al renovar token Zoho: " . $err);
         die("cURL Error #:" . $err);
     } else {
         $response_data = json_decode($response, true);
@@ -76,14 +91,19 @@ function refreshAccessToken($refresh_token) {
             $mysqli = getDatabaseConnection();
             $stmt = $mysqli->prepare("INSERT INTO oauth_tokens (access_token, refresh_token, token_type, expires_in, created_at) VALUES (?, ?, ?, ?, NOW())");
             $stmt->bind_param('ssss', $response_data['access_token'], $refresh_token, $response_data['token_type'], $response_data['expires_in']);
+            
             if (!$stmt->execute()) {
+                error_log("❌ Error al guardar el nuevo token de acceso: " . $stmt->error);
                 die("Error al guardar el token de acceso: " . $stmt->error);
             }
+
             $stmt->close();
             $mysqli->close();
 
+            error_log("✅ Token Zoho renovado y guardado correctamente.");
             return $response_data;
         } else {
+            error_log("⚠️ Error al renovar el token de acceso: " . json_encode($response_data));
             die("Error al renovar el token de acceso: " . json_encode($response_data));
         }
     }
