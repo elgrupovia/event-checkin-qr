@@ -114,37 +114,37 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
  * ---------------------------
  */
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
-function generar_qr_pdf_personalizado($request,$action_handler){
+function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
-        if(!$apellidos_persona && is_user_logged_in()){
+        if (!$apellidos_persona && is_user_logged_in()) {
             $user = wp_get_current_user();
             $apellidos_persona = $user->last_name ?? '';
         }
         $cargo_persona = sanitize_text_field($request['cargo'] ?? 'Cargo no especificado');
-        $nombre_completo = html_entity_decode(trim($nombre_persona.' '.$apellidos_persona), ENT_QUOTES|ENT_HTML5,'UTF-8');
+        $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $titulo_evento_formulario = sanitize_text_field($request['eventos_2025'][0] ?? '');
         $post_id = $titulo_evento_formulario ? buscar_evento_robusto($titulo_evento_formulario) : null;
         $titulo_a_mostrar = $post_id ? get_the_title($post_id) : ($titulo_evento_formulario ?: 'Evento no identificado');
-        $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES|ENT_HTML5,'UTF-8');
+        $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $ubicacion = get_post_meta($post_id,'ubicacion-evento',true) ?: 'Ubicación no disponible';
-        $fecha_evento = get_post_meta($post_id,'fecha',true);
-        if(is_numeric($fecha_evento)) $fecha_evento = date('d/m/Y H:i',$fecha_evento);
+        $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
+        $fecha_evento = get_post_meta($post_id, 'fecha', true);
+        if (is_numeric($fecha_evento)) $fecha_evento = date('d/m/Y H:i', $fecha_evento);
 
         $base_url = home_url('/checkin/');
         $params = [
-            'empresa'=>rawurlencode($nombre_empresa),
-            'nombre'=>rawurlencode($nombre_completo),
-            'cargo'=>rawurlencode($cargo_persona),
-            'evento'=>rawurlencode($titulo_a_mostrar),
-            'ubicacion'=>rawurlencode($ubicacion),
-            'fecha'=>rawurlencode($fecha_evento),
+            'empresa' => rawurlencode($nombre_empresa),
+            'nombre' => rawurlencode($nombre_completo),
+            'cargo' => rawurlencode($cargo_persona),
+            'evento' => rawurlencode($titulo_a_mostrar),
+            'ubicacion' => rawurlencode($ubicacion),
+            'fecha' => rawurlencode($fecha_evento),
         ];
-        $qr_url = $base_url.'?'.implode('&',array_map(fn($k,$v)=>"$k=$v",array_keys($params),$params));
+        $qr_url = $base_url . '?' . implode('&', array_map(fn($k, $v) => "$k=$v", array_keys($params), $params));
 
         $qr = Builder::create()
             ->writer(new PngWriter())
@@ -154,90 +154,104 @@ function generar_qr_pdf_personalizado($request,$action_handler){
             ->build();
 
         $upload_dir = wp_upload_dir();
-        $qr_path = $upload_dir['basedir'].'/temp_qr_'.uniqid().'.png';
+        $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
-        $pdf = new TCPDF('P','mm','A4',true,'UTF-8',false);
+        // === Generar PDF ===
+        $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
-        $pdf->SetMargins(12,20,12);
-        $pdf->SetAutoPageBreak(true,12);
+        $pdf->SetMargins(12, 20, 12);
+        $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
-        $logo_path = plugin_dir_path(__FILE__).'../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
-        if(file_exists($logo_path)) $pdf->Image($logo_path,85,8,35,'','JPG','','T',false,300);
+        $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
+        if (file_exists($logo_path)) $pdf->Image($logo_path, 85, 8, 35, '', 'JPG', '', 'T', false, 300);
 
         $imagen_insertada = false;
-        if($post_id){
-            $imagen_url = get_the_post_thumbnail_url($post_id,'full');
-            if($imagen_url){
-                $imagen_info = optimizar_imagen_para_pdf($imagen_url,$upload_dir);
+        if ($post_id) {
+            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+            if ($imagen_url) {
+                $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 $imagen_path = $imagen_info['path'];
-                if(file_exists($imagen_path)){
-                    $pdf->Image($imagen_path,(210-150)/2,30,150,'','','T',false,300);
+                if (file_exists($imagen_path)) {
+                    $pdf->Image($imagen_path, (210 - 150) / 2, 30, 150, '', '', 'T', false, 300);
                     $imagen_insertada = true;
                 }
             }
         }
 
-        $pdf->SetY($imagen_insertada?115:60);
-        $pdf->SetFont('helvetica','B',22);
-        $pdf->Cell(0,14,'ENTRADA CONFIRMADA',0,1,'C');
+        $pdf->SetY($imagen_insertada ? 115 : 60);
+        $pdf->SetFont('helvetica', 'B', 22);
+        $pdf->Cell(0, 14, 'ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(8);
 
-        $pdf->SetFont('helvetica','B',13);
-        $pdf->MultiCell(0,7,$titulo_a_mostrar,0,'C');
+        $pdf->SetFont('helvetica', 'B', 13);
+        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(5);
 
-        $pdf->SetFont('helvetica','',10);
-        $pdf->SetTextColor(80,80,80);
-        $pdf->MultiCell(0,5,htmlspecialchars($ubicacion,ENT_QUOTES,'UTF-8'),0,'C');
-        $pdf->MultiCell(0,5,htmlspecialchars($fecha_evento,ENT_QUOTES,'UTF-8'),0,'C');
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->MultiCell(0, 5, htmlspecialchars($ubicacion, ENT_QUOTES, 'UTF-8'), 0, 'C');
+        $pdf->MultiCell(0, 5, htmlspecialchars($fecha_evento, ENT_QUOTES, 'UTF-8'), 0, 'C');
         $pdf->Ln(10);
 
-        $pdf->SetTextColor(0,0,0);
-        $pdf->SetFont('helvetica','',10);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('helvetica', '', 10);
 
-        // Empresa
         $pdf->SetX(35);
-        $pdf->Write(6,'Empresa: ');
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->MultiCell(0,6,$nombre_empresa,0,'L');
-        $pdf->SetFont('helvetica','',10);
+        $pdf->Write(6, 'Empresa: ');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, $nombre_empresa, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
 
-        // Nombre
         $pdf->SetX(35);
-        $pdf->Write(6,'Nombre: ');
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->MultiCell(0,6,$nombre_completo,0,'L');
-        $pdf->SetFont('helvetica','',10);
+        $pdf->Write(6, 'Nombre: ');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, $nombre_completo, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
 
-        // Cargo
         $pdf->SetX(35);
-        $pdf->Write(6,'Cargo: ');
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->MultiCell(0,6,$cargo_persona,0,'L');
-        $pdf->SetFont('helvetica','',10);
+        $pdf->Write(6, 'Cargo: ');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->MultiCell(0, 6, $cargo_persona, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
 
         $pdf->Ln(8);
-        $pdf->SetFont('helvetica','B',9);
-        $pdf->SetTextColor(80,80,80);
-        $pdf->Cell(0,4,'CÓDIGO DE ESCANEO',0,1,'C');
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(4);
 
-        $pdf->Image($qr_path,(210-65)/2,$pdf->GetY(),65,65,'PNG','','',true,300);
+        $pdf->Image($qr_path, (210 - 65) / 2, $pdf->GetY(), 65, 65, 'PNG', '', '', true, 300);
 
-        $pdf_filename = 'entrada_'.preg_replace('/[^\p{L}\p{N}\-]+/u','-',$nombre_completo).'_'.time().'.pdf';
-        $pdf_path = $upload_dir['basedir'].'/'.$pdf_filename;
-        $pdf->Output($pdf_path,'F');
+        $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
+        $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
+        $pdf->Output($pdf_path, 'F');
         @unlink($qr_path);
 
-    } catch(Exception $e){
-        error_log("Error PDF: ".$e->getMessage());
+        /**
+         * ✅ NUEVO BLOQUE: Registrar asistente automáticamente
+         */
+        if ($post_id) {
+            $asistentes = get_post_meta($post_id, '_asistentes', true);
+            if (!is_array($asistentes)) $asistentes = [];
+            $asistentes[] = [
+                'nombre' => $nombre_completo,
+                'empresa' => $nombre_empresa,
+                'cargo' => $cargo_persona,
+                'fecha_hora' => current_time('mysql')
+            ];
+            update_post_meta($post_id, '_asistentes', $asistentes);
+        }
+
+    } catch (Exception $e) {
+        error_log("Error PDF: " . $e->getMessage());
     }
 }
+
 
 /**
  * ---------------------------
