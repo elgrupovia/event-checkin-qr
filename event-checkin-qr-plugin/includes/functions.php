@@ -315,30 +315,88 @@ add_action('template_redirect', function(){
  * Admin: Submenú Asistentes
  * ---------------------------
  */
-add_action('admin_menu', function(){
+add_action('admin_menu', function() {
     add_submenu_page(
         'edit.php?post_type=eventos',
         'Asistentes',
         'Asistentes',
         'manage_options',
         'eventos-asistentes',
-        function(){
-            $eventos = get_posts(['post_type'=>'eventos','numberposts'=>-1]);
-            echo '<h1>Asistentes por Evento</h1>';
-            foreach($eventos as $e){
-                echo '<h2>'.get_the_title($e->ID).'</h2>';
-                $asistentes = get_post_meta($e->ID,'_asistentes',true);
-                if($asistentes){
-                    echo '<ul>';
-                    foreach($asistentes as $a){
-                        echo '<li>'.esc_html($a['nombre']).' ('.esc_html($a['empresa']).') - '.esc_html($a['fecha_hora']).'</li>';
-                    }
-                    echo '</ul>';
-                } else {
-                    echo '<p>No hay asistentes registrados.</p>';
-                }
+        function() {
+            echo '<div class="wrap"><h1>🧾 Asistentes por Evento</h1>';
+
+            // Obtener todos los eventos publicados
+            $eventos = get_posts([
+                'post_type'   => 'eventos',
+                'numberposts' => -1,
+                'post_status' => 'publish',
+                'orderby'     => 'date',
+                'order'       => 'DESC',
+            ]);
+
+            if (!$eventos) {
+                echo '<p>No hay eventos publicados.</p></div>';
+                return;
             }
+
+            foreach ($eventos as $e) {
+                $post_id = $e->ID;
+                $titulo_evento = get_the_title($post_id);
+
+                // === Recuperar asistentes (versión robusta) ===
+                $meta_raw = get_post_meta($post_id, '_asistentes', false);
+                $asistentes = [];
+
+                if (!empty($meta_raw)) {
+                    foreach ($meta_raw as $meta_val) {
+                        $val = maybe_unserialize($meta_val);
+                        if (is_array($val)) {
+                            // Si es un array multidimensional (varios asistentes)
+                            if (isset($val[0]) && is_array($val[0])) {
+                                $asistentes = array_merge($asistentes, $val);
+                            } else {
+                                $asistentes[] = $val;
+                            }
+                        }
+                    }
+                }
+
+                // === Logs para depurar ===
+                error_log("📋 Evento listado en admin: {$post_id} - {$titulo_evento}");
+                error_log("   Meta asistentes: " . print_r($asistentes, true));
+
+                echo '<div style="margin-top:30px;padding:15px;border:1px solid #ddd;border-radius:10px;">';
+                echo '<h2 style="margin-bottom:10px;">' . esc_html($titulo_evento) . '</h2>';
+
+                if (!empty($asistentes)) {
+                    echo '<table class="widefat striped" style="max-width:900px;">';
+                    echo '<thead><tr>
+                            <th>Nombre</th>
+                            <th>Empresa</th>
+                            <th>Cargo</th>
+                            <th>Fecha / Hora Registro</th>
+                          </tr></thead><tbody>';
+
+                    foreach ($asistentes as $a) {
+                        echo '<tr>';
+                        echo '<td>' . esc_html($a['nombre'] ?? '') . '</td>';
+                        echo '<td>' . esc_html($a['empresa'] ?? '') . '</td>';
+                        echo '<td>' . esc_html($a['cargo'] ?? '') . '</td>';
+                        echo '<td>' . esc_html($a['fecha_hora'] ?? '') . '</td>';
+                        echo '</tr>';
+                    }
+
+                    echo '</tbody></table>';
+                } else {
+                    echo '<p style="color:#666;">No hay asistentes registrados aún.</p>';
+                }
+
+                echo '</div>';
+            }
+
+            echo '</div>'; // .wrap
         }
     );
 });
+
 ?>
