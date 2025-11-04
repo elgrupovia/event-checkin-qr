@@ -1,10 +1,9 @@
 <?php
 /**
- * Plugin: Event Check-In QR
- * Funcionalidad:
- *  - Genera PDF con QR personalizado al registrarse.
- *  - Registra asistentes al escanear el QR.
- *  - Muestra listado de asistentes en un submenú dentro de Eventos.
+ * Plugin Name: Event Check-In QR (Integración Zoho)
+ * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
+ * Version: 1.1
+ * 
  */
 
 if (!defined('ABSPATH')) exit;
@@ -248,7 +247,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         @unlink($qr_path);
 
         /**
-         * ✅ NUEVO BLOQUE: Registrar asistente automáticamente
+         * ✅ Registrar asistente localmente en post meta
          */
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true);
@@ -272,12 +271,91 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         error_log("=== [INSCRIPCIÓN FINALIZADA] ===");
 
+        /**
+         * ---------------------------
+         * 🔗 SINCRONIZACIÓN CON ZOHO CRM
+         * (se ejecuta aunque el asistente ya haya sido guardado localmente)
+         * ---------------------------
+         */
+        // Ruta: ajusta si es necesario. Asume /zoho/ dentro del plugin.
+        $zoho_dir = __DIR__ . '/zoho';
+        if (file_exists($zoho_dir . '/contacts.php')) {
+            try {
+                require_once $zoho_dir . '/config.php';   // contiene getAccessToken / refresh
+                require_once $zoho_dir . '/contacts.php'; // searchContactByEmail, createContact, etc.
+
+                // Datos para Zoho
+                $email = sanitize_email($request['email'] ?? '');
+                error_log("=== [ZOHO SYNC INICIADA] ===");
+                error_log("Buscando contacto por email: " . $email);
+
+                if ($email) {
+                    // Buscar contacto
+                    $search = null;
+                    if (function_exists('searchContactByEmail')) {
+                        $search = searchContactByEmail($email);
+                    } else {
+                        error_log("⚠️ searchContactByEmail() no existe en contacts.php");
+                    }
+
+                    $contactId = null;
+                    if (!empty($search) && !empty($search['data'][0]['id'])) {
+                        $contactId = $search['data'][0]['id'];
+                        error_log("Contacto encontrado en Zoho: $contactId");
+                    } else {
+                        // Crear (si existe createContact)
+                        if (function_exists('createContact')) {
+                            $newContactPayload = [
+                                "data" => [[
+                                    "First_Name" => $nombre_persona,
+                                    "Last_Name"  => $apellidos_persona ?: $nombre_persona,
+                                    "Email"      => $email,
+                                    "Company"    => $nombre_empresa,
+                                    "Title"      => $cargo_persona,
+                                ]]
+                            ];
+                            $created = createContact($newContactPayload);
+                            if (!empty($created['data'][0]['details']['id'])) {
+                                $contactId = $created['data'][0]['details']['id'];
+                                error_log("✅ Contacto creado en Zoho con ID: $contactId");
+                            } else {
+                                error_log("⚠️ Error al crear contacto en Zoho: " . print_r($created, true));
+                            }
+                        } else {
+                            error_log("⚠️ createContact() no existe en contacts.php");
+                        }
+                    }
+
+                    // Relacionar con evento en Zoho
+                    if ($contactId) {
+                        // Helper local (definidas a continuación) getEventoIdFromZoho() y relateContactToEvento()
+                        $eventoNombre = $titulo_a_mostrar ?? '';
+                        $eventoIdZoho = getEventoIdFromZoho($eventoNombre);
+                        if ($eventoIdZoho) {
+                            $rel = relateContactToEvento($contactId, $eventoIdZoho);
+                            error_log("Relación contact-evento Zoho respuesta: " . print_r($rel, true));
+                        } else {
+                            error_log("⚠️ No se encontró evento '$eventoNombre' en Zoho.");
+                        }
+                    }
+
+                } else {
+                    error_log("⚠️ No se proporcionó correo electrónico en el formulario; saltando sincronización Zoho.");
+                }
+
+                error_log("=== [ZOHO SYNC FINALIZADA] ===");
+
+            } catch (Exception $e) {
+                error_log("❌ Error en sincronización Zoho (catch): " . $e->getMessage());
+            }
+        } else {
+            error_log("⚠️ Carpeta zoho o contacts.php no encontrada en: $zoho_dir");
+        }
+
     } catch (Exception $e) {
         error_log("❌ Error PDF/Registro: " . $e->getMessage());
     }
 }
-
-
 
 /**
  * ---------------------------
@@ -290,6 +368,12 @@ add_action('template_redirect', function(){
         $empresa = sanitize_text_field($_GET['empresa'] ?? '');
         $cargo = sanitize_text_field($_GET['cargo'] ?? '');
         $evento = sanitize_text_field($_GET['evento'] ?? '');
+        $ubicacion = sanitize_text_field($_GET['ubicacion'] ?? '');
+        $fecha = sanitize_text_field($_GET['fecha'] ?? '');
+
+        // LOG de lectura de QR
+        error_log("=== [QR CHECKIN] ===");
+        error_log("Datos recibidos por QR: " . print_r($_GET, true));
 
         $post_id = buscar_evento_robusto($evento);
         if($post_id){
@@ -302,10 +386,18 @@ add_action('template_redirect', function(){
                 'fecha_hora'=>current_time('mysql')
             ];
             update_post_meta($post_id,'_asistentes',$asistentes);
+            error_log("Asistente registrado por QR en evento {$post_id}: " . print_r(end($asistentes), true));
+        } else {
+            error_log("⚠️ Evento no encontrado al hacer checkin: " . $evento);
         }
 
-        echo "<h2>Check-in confirmado</h2>";
-        echo "<p>Bienvenido: <strong>{$nombre}</strong></p>";
+        echo "<h2>Check-in confirmado ✅</h2>";
+        echo "<p>Bienvenido: <strong>" . esc_html($nombre) . "</strong></p>";
+        echo "<p><strong>Empresa:</strong> " . esc_html($empresa) . "</p>";
+        echo "<p><strong>Cargo:</strong> " . esc_html($cargo) . "</p>";
+        echo "<p><strong>Evento:</strong> " . esc_html($evento) . "</p>";
+        echo "<p><strong>Ubicación:</strong> " . esc_html($ubicacion) . "</p>";
+        echo "<p><strong>Fecha del evento:</strong> " . esc_html($fecha) . "</p>";
         exit;
     }
 });
@@ -398,5 +490,97 @@ add_action('admin_menu', function() {
         }
     );
 });
+
+/**
+ * ---------------------------
+ * Helper Zoho (locales para no tocar la librería Zoho)
+ * ---------------------------
+ */
+
+/**
+ * Buscar evento en Zoho CRM por nombre (módulo "Eventos")
+ */
+function getEventoIdFromZoho($nombreEvento) {
+    // Intentamos usar getAccessToken() del config.php si existe
+    if (function_exists('getAccessToken')) {
+        $access_token = getAccessToken();
+    } else {
+        error_log("⚠️ getAccessToken() no encontrada. Asegúrate de tener zoho/config.php con esa función.");
+        return null;
+    }
+
+    // Ajusta endpoint / criteria si tu campo para nombre tiene otro API name (ej: Event_Name)
+    $criteria = "(Event_Name:equals:" . addslashes($nombreEvento) . ")";
+    $url = "https://www.zohoapis.com/crm/v2/Eventos/search?criteria=" . urlencode($criteria);
+
+    $headers = [
+        "Authorization: Zoho-oauthtoken $access_token",
+        "Content-Type: application/json"
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    error_log("getEventoIdFromZoho response code: $httpcode, body: " . substr($response,0,1000));
+
+    if (!empty($data['data'][0]['id'])) {
+        error_log("Evento encontrado en Zoho: " . $data['data'][0]['id']);
+        return $data['data'][0]['id'];
+    } else {
+        error_log("Evento no encontrado en Zoho para: $nombreEvento");
+        return null;
+    }
+}
+
+/**
+ * Relacionar contacto con evento en Zoho CRM.
+ * IMPORTANTE: Ajusta el endpoint/subform name según tu configuración Zoho.
+ */
+function relateContactToEvento($contactId, $eventoId) {
+    if (function_exists('getAccessToken')) {
+        $access_token = getAccessToken();
+    } else {
+        return ['error' => 'getAccessToken() not found'];
+    }
+
+    // ⚠️ AJUSTA esto: nombre del subform/relación de tu módulo Contacts en Zoho
+    // Algunas instalaciones usan subform names o campos lookup. Cambia "Evento_Subform" por el API name real.
+    $subform_name = 'Evento_Subform';
+
+    $url = "https://www.zohoapis.com/crm/v2/Contacts/$contactId/$subform_name";
+
+    $body = [
+        "data" => [
+            [
+                // Esto depende de cómo esté construido tu subform o lookup
+                // Si tu subform requiere campos particulares, ajusta aquí.
+                "Evento" => ["id" => $eventoId]
+            ]
+        ]
+    ];
+
+    $headers = [
+        "Authorization: Zoho-oauthtoken $access_token",
+        "Content-Type: application/json"
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    error_log("relateContactToEvento response code: $httpcode, body: " . substr($response,0,1000));
+    $res = json_decode($response, true);
+    return $res ?: ['error' => "No response", 'http_code' => $httpcode];
+}
 
 ?>
