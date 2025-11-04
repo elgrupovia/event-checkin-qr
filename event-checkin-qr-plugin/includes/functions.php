@@ -116,6 +116,10 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
+        // === LOG INICIAL ===
+        error_log("=== [INSCRIPCIÓN INICIADA] ===");
+        error_log("Datos recibidos: " . print_r($request, true));
+
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
@@ -126,15 +130,23 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $cargo_persona = sanitize_text_field($request['cargo'] ?? 'Cargo no especificado');
         $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // === EVENTO DEL FORMULARIO ===
         $titulo_evento_formulario = sanitize_text_field($request['eventos_2025'][0] ?? '');
+        error_log("Título de evento desde formulario: " . $titulo_evento_formulario);
+
         $post_id = $titulo_evento_formulario ? buscar_evento_robusto($titulo_evento_formulario) : null;
+        error_log("Evento detectado ID: " . ($post_id ?: 'No encontrado'));
+
         $titulo_a_mostrar = $post_id ? get_the_title($post_id) : ($titulo_evento_formulario ?: 'Evento no identificado');
         $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        error_log("Título del evento final usado: " . $titulo_a_mostrar);
 
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
         $fecha_evento = get_post_meta($post_id, 'fecha', true);
         if (is_numeric($fecha_evento)) $fecha_evento = date('d/m/Y H:i', $fecha_evento);
 
+        // === QR URL ===
         $base_url = home_url('/checkin/');
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
@@ -146,6 +158,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         ];
         $qr_url = $base_url . '?' . implode('&', array_map(fn($k, $v) => "$k=$v", array_keys($params), $params));
 
+        error_log("QR URL generada: " . $qr_url);
+
+        // === Generar QR ===
         $qr = Builder::create()
             ->writer(new PngWriter())
             ->data($qr_url)
@@ -238,19 +253,30 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true);
             if (!is_array($asistentes)) $asistentes = [];
-            $asistentes[] = [
+
+            $nuevo_asistente = [
                 'nombre' => $nombre_completo,
                 'empresa' => $nombre_empresa,
                 'cargo' => $cargo_persona,
                 'fecha_hora' => current_time('mysql')
             ];
+            $asistentes[] = $nuevo_asistente;
+
             update_post_meta($post_id, '_asistentes', $asistentes);
+
+            // === LOG DEL ASISTENTE GUARDADO ===
+            error_log("Asistente guardado en evento ID {$post_id}: " . print_r($nuevo_asistente, true));
+        } else {
+            error_log("⚠️ No se guardó asistente porque no se detectó el evento.");
         }
 
+        error_log("=== [INSCRIPCIÓN FINALIZADA] ===");
+
     } catch (Exception $e) {
-        error_log("Error PDF: " . $e->getMessage());
+        error_log("❌ Error PDF/Registro: " . $e->getMessage());
     }
 }
+
 
 
 /**
