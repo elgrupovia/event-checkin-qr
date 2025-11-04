@@ -1,164 +1,144 @@
 <?php
-require_once 'config.php';
+// ============================================
+// 🔹 ZOHO CONTACT HANDLER (plugin version)
+// ============================================
+// Este archivo se encarga de buscar, crear o actualizar contactos
+// y vincularlos con eventos dentro del Zoho CRM desde el plugin
+// "event-checkin-qr-plugin".
 
-function getContacts($criteria = null) {
-    $access_token = getAccessToken();
-    $url = 'https://www.zohoapis.com/crm/v2/Contactos_vs_Eventos';
-    if ($criteria) {
-        $url .= '/search?criteria=' . urlencode($criteria);
-    }
+require_once __DIR__ . '/config.php';
 
-    $headers = array(
-        "Authorization: Zoho-oauthtoken $access_token"
-    );
+// --------------------------------------------
+// Helper para llamadas a la API de Zoho
+// --------------------------------------------
+if (!function_exists('zohoApiCall')) {
+    function zohoApiCall($method, $endpoint, $data = null) {
+        $access_token = getAccessToken();
+        $url = 'https://www.zohoapis.eu/crm/v2/' . $endpoint; // 🔸 usa el dominio .eu
 
-    $curl = curl_init($url);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        $headers = [
+            "Authorization: Zoho-oauthtoken $access_token",
+            "Content-Type: application/json"
+        ];
 
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-    if ($err) {
-        die("cURL Error #:" . $err);
-    } else {
-        return json_decode($response, true);
-    }
-}
+        if ($data) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        }
 
-function createContact($data) {
-    $access_token = getAccessToken();
-    $url = 'https://www.zohoapis.com/crm/v2/Contactos_vs_Eventos';
-    $headers = array(
-        "Authorization: Zoho-oauthtoken $access_token",
-        "Content-Type: application/json"
-    );
+        $response = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
 
-    $curl = curl_init($url);
-    curl_setopt($curl, CURLOPT_POST, true);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        if ($err) {
+            error_log("❌ cURL Error: $err");
+            return false;
+        }
 
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    if ($err) {
-        die("cURL Error #:" . $err);
-    } else {
-        return json_decode($response, true);
+        $decoded = json_decode($response, true);
+        error_log("📡 Zoho API [$endpoint]: " . print_r($decoded, true));
+        return $decoded;
     }
 }
 
+// --------------------------------------------
+// Buscar contacto por email
+// --------------------------------------------
+if (!function_exists('searchContactByEmail')) {
+    function searchContactByEmail($email) {
+        if (empty($email)) return false;
 
-function searchContactByEmail($email) {
-    $access_token = getAccessToken();
-    $url = "https://www.zohoapis.com/crm/v2/Contacts/search?criteria=(Email:equals:" . urlencode($email) . ")";
+        $endpoint = "Contacts/search?criteria=(Email:equals:" . urlencode($email) . ")";
+        $response = zohoApiCall("GET", $endpoint);
 
-    $headers = array(
-        "Authorization: Zoho-oauthtoken $access_token",
-        "Content-Type: application/json"
-    );
+        if (!empty($response['data'][0])) {
+            $contact = $response['data'][0];
+            error_log("✅ Contacto encontrado: " . $contact['Full_Name'] . " (ID: " . $contact['id'] . ")");
+            return $contact;
+        }
 
-    $curl = curl_init($url);
-    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "GET");
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    if ($err) {
-        error_log("cURL Error #:" . $err);
+        error_log("ℹ️ No se encontró contacto con el email: $email");
         return false;
-    } else {
-        $response_data = json_decode($response, true);
-        return $response_data; // Contiene la respuesta de la búsqueda
     }
 }
 
+// --------------------------------------------
+// Crear nuevo contacto
+// --------------------------------------------
+if (!function_exists('createContact')) {
+    function createContact($data) {
+        if (empty($data['Email'])) {
+            error_log("⚠️ Falta el campo 'Email' al crear contacto.");
+            return false;
+        }
 
-function updateuserByZohoID($id_zoho_user_web, $data) {
-    $access_token = getAccessToken();
-    $url = "https://www.zohoapis.com/crm/v2/Contacts/" . $id_zoho_user_web;
-    error_log('Función Actualizar USUARIO disparada a la URL: ' . $url);
-    error_log('Función Actualizar USUARIO disparada a la ID_USER_ZOHO_EN_WEB: ' .$id_zoho_user_web);
-    $headers = array(
-        "Authorization: Zoho-oauthtoken $access_token",
-        "Content-Type: application/json"
-    );
+        $payload = [
+            "data" => [[
+                "First_Name" => $data['First_Name'] ?? '',
+                "Last_Name"  => $data['Last_Name'] ?? 'Sin Apellido',
+                "Email"      => $data['Email'],
+                "Phone"      => $data['Phone'] ?? '',
+                "Title"      => $data['Title'] ?? '',
+                "Account_Name" => isset($data['Account_Name']) ? ["name" => $data['Account_Name']] : null
+            ]]
+        ];
 
-    $curl = curl_init($url);
-    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode(array("data" => [$data])));
+        $response = zohoApiCall("POST", "Contacts", $payload);
 
-    $response = curl_exec($curl);
-    error_log(print_r($response,true));
-    $err = curl_error($curl);
-    curl_close($curl);
-    
-    if ($err) {
-        error_log("cURL Error #:" . $err);
+        if (!empty($response['data'][0]['details']['id'])) {
+            $id = $response['data'][0]['details']['id'];
+            error_log("✅ Contacto creado con éxito: {$data['First_Name']} (ID: $id)");
+            return $id;
+        }
+
+        error_log("❌ Error al crear contacto: " . print_r($response, true));
         return false;
-    } else {
-        $response_data = json_decode($response, true);
-        return $response_data; // Contiene la respuesta de la actualización
     }
 }
 
+// --------------------------------------------
+// Actualizar contacto por ID de Zoho
+// --------------------------------------------
+if (!function_exists('updateContactByZohoID')) {
+    function updateContactByZohoID($contactId, $data) {
+        if (!$contactId) {
+            error_log("⚠️ updateContactByZohoID: ID no proporcionado.");
+            return false;
+        }
 
-function createLead($data) {
-    $access_token = getAccessToken();
-    $url = 'https://www.zohoapis.com/crm/v2/Leads';
-    $headers = array(
-        "Authorization: Zoho-oauthtoken $access_token",
-        "Content-Type: application/json"
-    );
+        $payload = ["data" => [$data]];
+        $response = zohoApiCall("PUT", "Contacts/$contactId", $payload);
 
-    $curl = curl_init($url);
-    curl_setopt($curl, CURLOPT_POST, true);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        if (!empty($response['data'][0]['code']) && $response['data'][0]['code'] === "SUCCESS") {
+            error_log("✅ Contacto actualizado correctamente (ID: $contactId)");
+            return true;
+        }
 
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    if ($err) {
-        error_log("cURL Error #:" . $err);
+        error_log("❌ Error al actualizar contacto: " . print_r($response, true));
         return false;
-    } else {
-        return json_decode($response, true);
     }
 }
 
+// --------------------------------------------
+// Crear un Lead (opcional)
+// --------------------------------------------
+if (!function_exists('createLead')) {
+    function createLead($data) {
+        $payload = ["data" => [$data]];
+        $response = zohoApiCall("POST", "Leads", $payload);
 
-// Ejemplo de uso
-//$criteria = "(Contactos:starts_with:David)";
-//$response = getContacts($criteria);
-//echo '<pre>'; print_r($response); echo '</pre>';
+        if (!empty($response['data'][0]['details']['id'])) {
+            $id = $response['data'][0]['details']['id'];
+            error_log("✅ Lead creado (ID: $id)");
+            return $id;
+        }
 
-/*$new_contact = array(
-    "data" => [
-        [
-            "First_Name" => "John",
-            "Last_Name" => "Macarrita",
-            "Email" => "john.doe@example.com",
-            "Empresa" => 1442205000010833013,
-            "Contactos" => 1442205000002177141,
-            "Status" => "Seguir",
-            "Eventos" => 1442205000105515156
-        ]
-    ]
-);
-$response = createContact($new_contact);
-echo '<pre>'; print_r($response); echo '</pre>';
-
-*/
+        error_log("❌ Error al crear lead: " . print_r($response, true));
+        return false;
+    }
+}
 ?>
