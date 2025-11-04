@@ -119,6 +119,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         error_log("=== [INSCRIPCIÓN INICIADA] ===");
         error_log("Datos recibidos: " . print_r($request, true));
 
+        // --- Datos básicos del formulario ---
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
@@ -129,7 +130,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $cargo_persona = sanitize_text_field($request['cargo'] ?? 'Cargo no especificado');
         $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // === EVENTO DEL FORMULARIO ===
+        // --- Evento del formulario ---
         $titulo_evento_formulario = sanitize_text_field($request['eventos_2025'][0] ?? '');
         error_log("Título de evento desde formulario: " . $titulo_evento_formulario);
 
@@ -145,7 +146,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $fecha_evento = get_post_meta($post_id, 'fecha', true);
         if (is_numeric($fecha_evento)) $fecha_evento = date('d/m/Y H:i', $fecha_evento);
 
-        // === QR URL ===
+        // --- QR URL ---
         $base_url = home_url('/checkin/');
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
@@ -159,9 +160,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         error_log("QR URL generada: " . $qr_url);
 
-        // === Generar QR ===
-        $qr = Builder::create()
-            ->writer(new PngWriter())
+        // --- Generar QR ---
+        $qr = \Endroid\QrCode\Builder\Builder::create()
+            ->writer(new \Endroid\QrCode\Writer\PngWriter())
             ->data($qr_url)
             ->size(400)
             ->margin(15)
@@ -171,14 +172,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
-        // === Generar PDF ===
+        // --- Generar PDF ---
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->SetCompression(false);
         $pdf->SetImageScale(4);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         $pdf->SetMargins(12, 20, 12);
-        $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
         $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
@@ -201,11 +201,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', 'B', 22);
         $pdf->Cell(0, 14, 'ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(8);
-
         $pdf->SetFont('helvetica', 'B', 13);
         $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(5);
-
         $pdf->SetFont('helvetica', '', 10);
         $pdf->SetTextColor(80, 80, 80);
         $pdf->MultiCell(0, 5, htmlspecialchars($ubicacion, ENT_QUOTES, 'UTF-8'), 0, 'C');
@@ -214,45 +212,36 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', '', 10);
-
         $pdf->SetX(35);
         $pdf->Write(6, 'Empresa: ');
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->MultiCell(0, 6, $nombre_empresa, 0, 'L');
         $pdf->SetFont('helvetica', '', 10);
-
         $pdf->SetX(35);
         $pdf->Write(6, 'Nombre: ');
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->MultiCell(0, 6, $nombre_completo, 0, 'L');
         $pdf->SetFont('helvetica', '', 10);
-
         $pdf->SetX(35);
         $pdf->Write(6, 'Cargo: ');
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->MultiCell(0, 6, $cargo_persona, 0, 'L');
         $pdf->SetFont('helvetica', '', 10);
-
         $pdf->Ln(8);
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(80, 80, 80);
         $pdf->Cell(0, 4, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         $pdf->Ln(4);
-
         $pdf->Image($qr_path, (210 - 65) / 2, $pdf->GetY(), 65, 65, 'PNG', '', '', true, 300);
-
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         @unlink($qr_path);
 
-        /**
-         * ✅ Registrar asistente localmente en post meta
-         */
+        // --- Guardar asistente localmente ---
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true);
             if (!is_array($asistentes)) $asistentes = [];
-
             $nuevo_asistente = [
                 'nombre' => $nombre_completo,
                 'empresa' => $nombre_empresa,
@@ -260,102 +249,67 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 'fecha_hora' => current_time('mysql')
             ];
             $asistentes[] = $nuevo_asistente;
-
             update_post_meta($post_id, '_asistentes', $asistentes);
-
-            // === LOG DEL ASISTENTE GUARDADO ===
             error_log("Asistente guardado en evento ID {$post_id}: " . print_r($nuevo_asistente, true));
-        } else {
-            error_log("⚠️ No se guardó asistente porque no se detectó el evento.");
         }
 
         error_log("=== [INSCRIPCIÓN FINALIZADA] ===");
 
-        /**
-         * ---------------------------
-         * 🔗 SINCRONIZACIÓN CON ZOHO CRM
-         * (se ejecuta aunque el asistente ya haya sido guardado localmente)
-         * ---------------------------
-         */
-        // Ruta: ajusta si es necesario. Asume /zoho/ dentro del plugin.
+        // ============================================================
+        // 🔗 SINCRONIZACIÓN CON ZOHO CRM (CONTACTOS + EVENTOS)
+        // ============================================================
+
         $zoho_dir = dirname(plugin_dir_path(__FILE__)) . '/zoho';
         if (file_exists($zoho_dir . '/contacts.php')) {
-            try {
-                require_once $zoho_dir . '/config.php';   // contiene getAccessToken / refresh
-                require_once $zoho_dir . '/contacts.php'; // searchContactByEmail, createContact, etc.
+            require_once $zoho_dir . '/config.php';
+            require_once $zoho_dir . '/contacts.php';
 
-                // Datos para Zoho
-                $email = sanitize_email($request['email'] ?? '');
-                error_log("=== [ZOHO SYNC INICIADA] ===");
-                error_log("Buscando contacto por email: " . $email);
+            $email = sanitize_email($request['email'] ?? '');
+            $titulo_evento = $titulo_a_mostrar;
 
-                if ($email) {
-                    // Buscar contacto
-                    $search = null;
-                    if (function_exists('searchContactByEmail')) {
-                        $search = searchContactByEmail($email);
-                    } else {
-                        error_log("⚠️ searchContactByEmail() no existe en contacts.php");
-                    }
-
-                    $contactId = null;
-                    if (!empty($search) && !empty($search['data'][0]['id'])) {
-                        $contactId = $search['data'][0]['id'];
-                        error_log("Contacto encontrado en Zoho: $contactId");
-                    } else {
-                        // Crear (si existe createContact)
-                        if (function_exists('createContact')) {
-                            $newContactPayload = [
-                                "data" => [[
-                                    "First_Name" => $nombre_persona,
-                                    "Last_Name"  => $apellidos_persona ?: $nombre_persona,
-                                    "Email"      => $email,
-                                    "Company"    => $nombre_empresa,
-                                    "Title"      => $cargo_persona,
-                                ]]
-                            ];
-                            $created = createContact($newContactPayload);
-                            if (!empty($created['data'][0]['details']['id'])) {
-                                $contactId = $created['data'][0]['details']['id'];
-                                error_log("✅ Contacto creado en Zoho con ID: $contactId");
-                            } else {
-                                error_log("⚠️ Error al crear contacto en Zoho: " . print_r($created, true));
-                            }
-                        } else {
-                            error_log("⚠️ createContact() no existe en contacts.php");
-                        }
-                    }
-
-                    // Relacionar con evento en Zoho
-                    if ($contactId) {
-                        // Helper local (definidas a continuación) getEventoIdFromZoho() y relateContactToEvento()
-                        $eventoNombre = $titulo_a_mostrar ?? '';
-                        $eventoIdZoho = getEventoIdFromZoho($eventoNombre);
-                        if ($eventoIdZoho) {
-                            $rel = relateContactToEvento($contactId, $eventoIdZoho);
-                            error_log("Relación contact-evento Zoho respuesta: " . print_r($rel, true));
-                        } else {
-                            error_log("⚠️ No se encontró evento '$eventoNombre' en Zoho.");
-                        }
-                    }
-
-                } else {
-                    error_log("⚠️ No se proporcionó correo electrónico en el formulario; saltando sincronización Zoho.");
-                }
-
-                error_log("=== [ZOHO SYNC FINALIZADA] ===");
-
-            } catch (Exception $e) {
-                error_log("❌ Error en sincronización Zoho (catch): " . $e->getMessage());
+            if (!$email) {
+                error_log("⚠️ No se proporcionó email, se omite sincronización Zoho.");
+                return;
             }
+
+            error_log("=== [ZOHO SYNC INICIADA] ===");
+            error_log("Buscando contacto por email: " . $email);
+
+            $busqueda = searchContactByEmail($email);
+            if (isset($busqueda['data'][0]['id'])) {
+                $contactId = $busqueda['data'][0]['id'];
+                error_log("✅ Contacto existente en Zoho: $contactId");
+            } else {
+                $nuevo = createContactZoho([
+                    "First_Name" => $nombre_persona,
+                    "Last_Name"  => $apellidos_persona ?: $nombre_persona,
+                    "Email"      => $email,
+                    "Account_Name" => $nombre_empresa,
+                    "Title" => $cargo_persona
+                ]);
+                $contactId = $nuevo['data'][0]['details']['id'] ?? null;
+                error_log("🆕 Contacto creado en Zoho con ID: $contactId");
+            }
+
+            // Buscar evento Zoho
+            $eventId = obtenerEventoZohoId($titulo_evento);
+            if ($contactId && $eventId) {
+                $relacion = createContactEventRelation($contactId, $eventId, "Inscrito");
+                error_log("🔗 Relación contacto-evento creada: " . print_r($relacion, true));
+            } else {
+                error_log("⚠️ No se pudo vincular contacto y evento en Zoho. ContactID: $contactId, EventID: $eventId");
+            }
+
+            error_log("=== [ZOHO SYNC FINALIZADA] ===");
         } else {
-            error_log("⚠️ Carpeta zoho o contacts.php no encontrada en: $zoho_dir");
+            error_log("⚠️ No se encontró carpeta zoho o contacts.php.");
         }
 
     } catch (Exception $e) {
         error_log("❌ Error PDF/Registro: " . $e->getMessage());
     }
 }
+
 
 /**
  * ---------------------------
