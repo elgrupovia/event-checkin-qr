@@ -278,7 +278,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          * ---------------------------
          */
         // Ruta: ajusta si es necesario. Asume /zoho/ dentro del plugin.
-        $zoho_dir = plugin_dir_path(__FILE__) . 'zoho';
+        $zoho_dir = dirname(plugin_dir_path(__FILE__)) . '/zoho';
         if (file_exists($zoho_dir . '/contacts.php')) {
             try {
                 require_once $zoho_dir . '/config.php';   // contiene getAccessToken / refresh
