@@ -151,6 +151,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             'empresa' => rawurlencode($nombre_empresa),
             'nombre' => rawurlencode($nombre_completo),
             'cargo' => rawurlencode($cargo_persona),
+            'email' => rawurlencode($request['email']), 
             'evento' => rawurlencode($titulo_a_mostrar),
             'ubicacion' => rawurlencode($ubicacion),
             'fecha' => rawurlencode($fecha_evento),
@@ -387,6 +388,30 @@ add_action('template_redirect', function(){
             ];
             update_post_meta($post_id,'_asistentes',$asistentes);
             error_log("Asistente registrado por QR en evento {$post_id}: " . print_r(end($asistentes), true));
+            // 🔗 Actualizar asistencia en Zoho CRM (campo "Asiste" = "Sí")
+            require_once dirname(__FILE__) . '/../zoho/config.php';
+            require_once dirname(__FILE__) . '/../zoho/contacts.php';
+            require_once dirname(__FILE__) . '/../zoho/eventos.php';
+
+            $email = sanitize_email($_GET['email'] ?? '');
+            if ($email) {
+                $busqueda = searchContactByEmail($email);
+                if (isset($busqueda['data'][0]['id'])) {
+                    $contactId = $busqueda['data'][0]['id'];
+                    $eventZohoId = obtenerEventoZohoId($evento);
+                    if ($eventZohoId) {
+                        $marcado = marcarAsistenciaZoho($contactId, $eventZohoId);
+                        error_log("✅ Asistencia marcada en Zoho para contacto {$contactId} en evento {$eventZohoId}");
+                    } else {
+                        error_log("⚠️ No se encontró el evento en Zoho para marcar asistencia: $evento");
+                    }
+                } else {
+                    error_log("⚠️ No se encontró contacto en Zoho con el correo: $email");
+                }
+            } else {
+                error_log("⚠️ No se recibió email en el QR, no se pudo marcar asistencia en Zoho.");
+            }
+
         } else {
             error_log("⚠️ Evento no encontrado al hacer checkin: " . $evento);
         }
@@ -582,5 +607,142 @@ function relateContactToEvento($contactId, $eventoId) {
     $res = json_decode($response, true);
     return $res ?: ['error' => "No response", 'http_code' => $httpcode];
 }
+
+/**
+ * Sincroniza registro de asistentes con Zoho CRM
+ * - Busca contacto por email
+ * - Crea contacto si no existe
+ * - Busca evento en Zoho
+ * - Crea relación Contacto ↔ Evento en "Contactos_vs_Eventos"
+ * - Marca campo Asiste cuando se hace check-in
+ */
+
+require_once plugin_dir_path(__FILE__) . '../zoho/config.php';
+require_once plugin_dir_path(__FILE__) . '../zoho/contacts.php';
+require_once plugin_dir_path(__FILE__) . '../zoho/eventos.php';
+
+function sync_with_zoho($email, $nombre, $apellidos, $empresa, $titulo_evento) {
+    error_log("=== [ZOHO SYNC INICIADA] ===");
+
+    // Buscar contacto existente
+    $busqueda = searchContactByEmail($email);
+    if (isset($busqueda['data'][0]['id'])) {
+        $contactId = $busqueda['data'][0]['id'];
+        error_log("✅ Contacto existente en Zoho: $contactId");
+    } else {
+        // Crear nuevo contacto
+        $nuevo = createContactZoho([
+            "First_Name" => $nombre,
+            "Last_Name"  => $apellidos,
+            "Email"      => $email,
+            "Account_Name" => $empresa
+        ]);
+        $contactId = $nuevo['data'][0]['details']['id'] ?? null;
+        error_log("🆕 Contacto creado en Zoho con ID: $contactId");
+    }
+
+    // Buscar evento en Zoho CRM (por su título)
+    $eventZohoId = obtenerEventoZohoId($titulo_evento);
+    if (!$eventZohoId) {
+        error_log("⚠️ No se encontró el evento '$titulo_evento' en Zoho CRM.");
+        return;
+    }
+
+    // Crear o actualizar la relación en Contactos_vs_Eventos
+    $relation = createContactEventRelation($contactId, $eventZohoId, "No");
+    error_log("🔗 Relación Contacto ↔ Evento creada/actualizada.");
+    error_log(print_r($relation, true));
+
+    error_log("=== [ZOHO SYNC FINALIZADA] ===");
+}
+
+/**
+ * Busca un evento en Zoho CRM por su nombre
+ */
+function obtenerEventoZohoId($titulo_evento) {
+    $access_token = getAccessToken();
+    $url = "https://www.zohoapis.com/crm/v2/Eventos/search?criteria=(Eventos:equals:" . urlencode($titulo_evento) . ")";
+
+    $headers = ["Authorization: Zoho-oauthtoken $access_token"];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    if (!empty($data['data'][0]['id'])) {
+        return $data['data'][0]['id'];
+    }
+    return null;
+}
+
+/**
+ * Crea una relación Contacto ↔ Evento en Zoho CRM
+ */
+function createContactEventRelation($contactId, $eventId, $asiste = "No") {
+    $access_token = getAccessToken();
+    $url = "https://www.zohoapis.com/crm/v2/Contactos_vs_Eventos";
+    $headers = [
+        "Authorization: Zoho-oauthtoken $access_token",
+        "Content-Type: application/json"
+    ];
+
+    $body = [
+        "data" => [[
+            "Contactos" => ["id" => $contactId],
+            "Eventos"   => ["id" => $eventId],
+            "Asiste"    => $asiste
+        ]]
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return json_decode($response, true);
+}
+
+/**
+ * Marca al contacto como asistente en el evento (cuando se escanea el QR)
+ */
+function marcarAsistenciaZoho($contactId, $eventId) {
+    $access_token = getAccessToken();
+    $url = "https://www.zohoapis.com/crm/v2/Contactos_vs_Eventos/search?criteria=(Contactos.id:equals:$contactId)and(Eventos.id:equals:$eventId)";
+    $headers = ["Authorization: Zoho-oauthtoken $access_token"];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    $relationId = $data['data'][0]['id'] ?? null;
+    if (!$relationId) return false;
+
+    // Actualiza el campo Asiste = "Sí"
+    $updateUrl = "https://www.zohoapis.com/crm/v2/Contactos_vs_Eventos/$relationId";
+    $body = [
+        "data" => [[
+            "Asiste" => "Sí"
+        ]]
+    ];
+
+    $ch = curl_init($updateUrl);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array_merge($headers, ["Content-Type: application/json"]));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $updateResponse = curl_exec($ch);
+    curl_close($ch);
+
+    return json_decode($updateResponse, true);
+}
+
 
 ?>
