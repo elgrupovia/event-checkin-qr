@@ -7,8 +7,10 @@
  */
 
 if (!defined('ABSPATH')) exit;
+error_log("✅ Event Check-In QR cargando correctamente");
 
-require_once __DIR__ . '/../vendor/autoload.php';
+
+require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
 
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
@@ -182,7 +184,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
-        $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
+        $logo_path = plugin_dir_path(__FILE__) . 'assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
+
         if (file_exists($logo_path)) $pdf->Image($logo_path, 85, 8, 35, '', 'JPG', '', 'T', false, 300);
 
         $imagen_insertada = false;
