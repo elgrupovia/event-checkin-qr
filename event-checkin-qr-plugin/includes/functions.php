@@ -7,15 +7,9 @@
  */
 
 if (!defined('ABSPATH')) exit;
-error_log("✅ Event Check-In QR cargando correctamente");
 
+require_once __DIR__ . '/../vendor/autoload.php';
 
-$vendor = dirname(plugin_dir_path(__FILE__)) . '/vendor/autoload.php';
-if (file_exists($vendor)) {
-    require_once $vendor;
-} else {
-    error_log("⚠️ vendor autoload no encontrado: $vendor");
-}
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
 use TCPDF;
@@ -188,8 +182,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
-        $logo_path = plugin_dir_path(__FILE__) . 'assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
-
+        $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
         if (file_exists($logo_path)) $pdf->Image($logo_path, 85, 8, 35, '', 'JPG', '', 'T', false, 300);
 
         $imagen_insertada = false;
@@ -624,13 +617,9 @@ function relateContactToEvento($contactId, $eventoId) {
  * - Marca campo Asiste cuando se hace check-in
  */
 
-// Cargamos archivos de Zoho en init para evitar ejecutar llamadas a red/BD durante la activación
-add_action('init', function() {
-    $zoho_base = dirname(plugin_dir_path(__FILE__)) . '/zoho';
-    if (file_exists($zoho_base . '/config.php')) require_once $zoho_base . '/config.php';
-    if (file_exists($zoho_base . '/contacts.php')) require_once $zoho_base . '/contacts.php';
-    if (file_exists($zoho_base . '/eventos.php')) require_once $zoho_base . '/eventos.php';
-});
+require_once plugin_dir_path(__FILE__) . '../zoho/config.php';
+require_once plugin_dir_path(__FILE__) . '../zoho/contacts.php';
+require_once plugin_dir_path(__FILE__) . '../zoho/eventos.php';
 
 function sync_with_zoho($email, $nombre, $apellidos, $empresa, $titulo_evento) {
     error_log("=== [ZOHO SYNC INICIADA] ===");
