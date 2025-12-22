@@ -7,38 +7,38 @@ namespace Composer\Autoload;
 class ComposerStaticInita15d824f90aa46001176ade6d3c80a68
 {
     public static $prefixLengthsPsr4 = array (
-        'I' => 
+        'I' =>
         array (
             'It2\\EventCheckinQr\\' => 19,
         ),
-        'E' => 
+        'E' =>
         array (
             'Endroid\\QrCode\\' => 15,
         ),
-        'D' => 
+        'D' =>
         array (
             'DASPRiD\\Enum\\' => 13,
         ),
-        'B' => 
+        'B' =>
         array (
             'BaconQrCode\\' => 12,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'It2\\EventCheckinQr\\' => 
+        'It2\\EventCheckinQr\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
-        'Endroid\\QrCode\\' => 
+        'Endroid\\QrCode\\' =>
         array (
             0 => __DIR__ . '/..' . '/endroid/qr-code/src',
         ),
-        'DASPRiD\\Enum\\' => 
+        'DASPRiD\\Enum\\' =>
         array (
             0 => __DIR__ . '/..' . '/dasprid/enum/src',
         ),
-        'BaconQrCode\\' => 
+        'BaconQrCode\\' =>
         array (
             0 => __DIR__ . '/..' . '/bacon/bacon-qr-code/src',
         ),
