@@ -182,10 +182,35 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
-// === Diseño nuevo: banner a todo ancho y barra dorada ===
+// === Banner a todo ancho: usar la foto destacada del evento ===
 $bannerH = 48;
-$pdf->SetFillColor(0, 0, 0); // negro
-$pdf->Rect(0, 0, $pdf->getPageWidth(), $bannerH, 'F');
+$banner_insertado = false;
+if ($post_id) {
+    $banner_url = get_the_post_thumbnail_url($post_id, 'full');
+    if ($banner_url) {
+        $banner_info = optimizar_imagen_para_pdf($banner_url, $upload_dir);
+        $banner_path = $banner_info['path'];
+        if (file_exists($banner_path)) {
+            $pageW = $pdf->getPageWidth();
+            // Image ocupa todo el ancho, altura controlada por $bannerH
+            $pdf->Image($banner_path, 0, 0, $pageW, $bannerH, '', '', '', false, 300);
+            $banner_insertado = true;
+            // Overlay semitransparente para que el texto sea legible
+            if (method_exists($pdf, 'SetAlpha')) {
+                $pdf->SetAlpha(0.35);
+                $pdf->SetFillColor(0, 0, 0);
+                $pdf->Rect(0, 0, $pageW, $bannerH, 'F');
+                $pdf->SetAlpha(1);
+            }
+        }
+    }
+}
+
+if (!$banner_insertado) {
+    // Fallback si no hay imagen: banner negro
+    $pdf->SetFillColor(0, 0, 0);
+    $pdf->Rect(0, 0, $pdf->getPageWidth(), $bannerH, 'F');
+}
 // barra dorada fina
 $pdf->SetFillColor(212, 175, 55); // dorado
 $pdf->Rect(0, $bannerH, $pdf->getPageWidth(), 4, 'F');
@@ -209,22 +234,8 @@ $pdf->SetXY($indicX, $indicY + 2);
 // Check ✓ (UTF-8) + texto
 $pdf->Cell($indicW, 8, "✓  ENTRADA CONFIRMADA", 0, 1, 'C', 0, '', 0, false);
 
-// === Imagen del evento (centrada) posicionada por debajo del indicador ===
-$imagen_insertada = false;
-$imgY = $indicY + $indicH + 8;
-if ($post_id) {
-    $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-    if ($imagen_url) {
-        $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
-        $imagen_path = $imagen_info['path'];
-        if (file_exists($imagen_path)) {
-            $pdf->Image($imagen_path, (210 - 150) / 2, $imgY, 150, '', '', 'T', false, 300);
-            $imagen_insertada = true;
-        }
-    }
-}
-
-$startY = $imagen_insertada ? ($imgY + 90) : ($indicY + $indicH + 8);
+// Posicionar contenido principal debajo del indicador
+$startY = $indicY + $indicH + 8;
 $pdf->SetY($startY);
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetFont('dejavusans', '', 10);
