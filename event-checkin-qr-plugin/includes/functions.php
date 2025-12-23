@@ -203,10 +203,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->Ln(13);
 
-        // === TÍTULO DEL EVENTO ===
-        $pdf->SetTextColor(33, 33, 33);
-        $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
+        // === TÍTULO DEL EVENTO (discreto) ===
+        $pdf->SetTextColor(140, 140, 140);
+        $pdf->SetFont('helvetica', '', 11);
+        $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
 
         // === FECHA Y UBICACIÓN ===
@@ -242,11 +242,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
         $pdf->Ln(3);
 
-        // === DATOS ADICIONALES (opcional) ===
+        // === EMPRESA Y CARGO (sin etiquetas) ===
         $pdf->SetTextColor(80, 80, 80);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell(0, 4, $nombre_empresa, 0, 1, 'C');
         $pdf->SetFont('helvetica', '', 8);
-        $pdf->Cell(0, 4, 'Empresa: ' . $nombre_empresa, 0, 1, 'C');
-        $pdf->Cell(0, 4, 'Cargo: ' . $cargo_persona, 0, 1, 'C');
+        $pdf->Cell(0, 4, $cargo_persona, 0, 1, 'C');
         $pdf->Ln(6);
 
         // === CÓDIGO QR ===
