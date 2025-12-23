@@ -182,30 +182,55 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(true, 12);
         $pdf->AddPage();
 
-        $logo_path = plugin_dir_path(__FILE__) . '../assets/LOGO_GRUPO_VIA_RGB__NEGRO.jpg';
-        if (file_exists($logo_path)) $pdf->Image($logo_path, 85, 8, 35, '', 'JPG', '', 'T', false, 300);
+// === Diseño nuevo: banner a todo ancho y barra dorada ===
+$bannerH = 48;
+$pdf->SetFillColor(0, 0, 0); // negro
+$pdf->Rect(0, 0, $pdf->getPageWidth(), $bannerH, 'F');
+// barra dorada fina
+$pdf->SetFillColor(212, 175, 55); // dorado
+$pdf->Rect(0, $bannerH, $pdf->getPageWidth(), 4, 'F');
 
-        $imagen_insertada = false;
-        if ($post_id) {
-            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-            if ($imagen_url) {
-                $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
-                $imagen_path = $imagen_info['path'];
-                if (file_exists($imagen_path)) {
-                    $pdf->Image($imagen_path, (210 - 150) / 2, 30, 150, '', '', 'T', false, 300);
-                    $imagen_insertada = true;
-                }
-            }
+// Título del evento dentro del banner (centrado, blanco)
+$pdf->SetY(12);
+$pdf->SetTextColor(255, 255, 255);
+$pdf->SetFont('dejavusans', 'B', 20);
+$pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C', 0, 1);
+
+// Indicador verde con check debajo del banner
+$indicY = $bannerH + 8;
+$indicW = 140;
+$indicH = 14;
+$indicX = ($pdf->getPageWidth() - $indicW) / 2;
+$pdf->SetFillColor(0, 153, 51); // verde corporativo
+$pdf->RoundedRect($indicX, $indicY, $indicW, $indicH, 3, '1111', 'F');
+$pdf->SetTextColor(255, 255, 255);
+$pdf->SetFont('dejavusans', 'B', 11);
+$pdf->SetXY($indicX, $indicY + 2);
+// Check ✓ (UTF-8) + texto
+$pdf->Cell($indicW, 8, "✓  ENTRADA CONFIRMADA", 0, 1, 'C', 0, '', 0, false);
+
+// === Imagen del evento (centrada) posicionada por debajo del indicador ===
+$imagen_insertada = false;
+$imgY = $indicY + $indicH + 8;
+if ($post_id) {
+    $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+    if ($imagen_url) {
+        $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
+        $imagen_path = $imagen_info['path'];
+        if (file_exists($imagen_path)) {
+            $pdf->Image($imagen_path, (210 - 150) / 2, $imgY, 150, '', '', 'T', false, 300);
+            $imagen_insertada = true;
         }
+    }
+}
 
-        $pdf->SetY($imagen_insertada ? 115 : 60);
-        $pdf->SetFont('helvetica', 'B', 22);
-        $pdf->Cell(0, 14, 'ENTRADA CONFIRMADA', 0, 1, 'C');
-        $pdf->Ln(8);
+$startY = $imagen_insertada ? ($imgY + 90) : ($indicY + $indicH + 8);
+$pdf->SetY($startY);
+$pdf->SetTextColor(0, 0, 0);
+$pdf->SetFont('dejavusans', '', 10);
 
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(5);
+// El título se muestra en el banner superior
+$pdf->Ln(2);
 
         $pdf->SetFont('helvetica', '', 10);
         $pdf->SetTextColor(80, 80, 80);
