@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.1
+ * Version: 1.4
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -114,15 +114,9 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
-        error_log("=== [INSCRIPCIÓN INICIADA] ===");
-
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
-        if (!$apellidos_persona && is_user_logged_in()) {
-            $user = wp_get_current_user();
-            $apellidos_persona = $user->last_name ?? '';
-        }
         $cargo_persona = sanitize_text_field($request['cargo'] ?? 'Cargo no especificado');
         $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
@@ -142,12 +136,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             'empresa' => rawurlencode($nombre_empresa),
             'nombre' => rawurlencode($nombre_completo),
             'cargo' => rawurlencode($cargo_persona),
-            'email' => rawurlencode($request['email']), 
+            'email' => rawurlencode($request['email'] ?? ''), 
             'evento' => rawurlencode($titulo_a_mostrar),
-            'ubicacion' => rawurlencode($ubicacion),
-            'fecha' => rawurlencode($fecha_evento),
         ];
-        $qr_url = $base_url . '?' . implode('&', array_map(fn($k, $v) => "$k=$v", array_keys($params), $params));
+        $qr_url = $base_url . '?' . http_build_query($params);
 
         $qr = Builder::create()->writer(new PngWriter())->data($qr_url)->size(300)->margin(10)->build();
         $upload_dir = wp_upload_dir();
@@ -159,30 +151,33 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         $pdf->SetMargins(0, 0, 0); 
-        $pdf->SetAutoPageBreak(true, 15); // Re-activamos pero con margen inferior
         $pdf->AddPage();
 
-        $y_pos = 15; 
+        $y_dinamica = 15; // Margen si no hay foto
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
-                    list($w_orig, $h_orig) = getimagesize($imagen_info['path']);
-                    // CÁLCULO DE PROPORCIÓN REAL:
-                    // Dejamos la altura en 0 para que TCPDF calcule automáticamente la proporción 
-                    // basándose en el ancho de 210mm y el archivo original.
-                    $pdf->Image($imagen_info['path'], 0, 0, 210, 0, '', '', 'T', false, 300);
-                    $y_pos = $pdf->GetY() + 8; // GetY() nos da dónde terminó de dibujarse la imagen
+                    // Obtener dimensiones reales para calcular altura y evitar solapamiento
+                    list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
+                    $ancho_pdf = 210; 
+                    $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
+
+                    $pdf->Image($imagen_info['path'], 0, 0, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    
+                    // Empujamos el cursor debajo de la imagen + margen de seguridad
+                    $y_dinamica = $alto_pdf + 10;
                 }
             }
         }
 
+        // Aplicar márgenes para el texto y situar cursor debajo de la imagen
         $pdf->SetMargins(15, 0, 15);
-        $pdf->SetY($y_pos);
+        $pdf->SetAbsY($y_dinamica);
 
-        // INDICADOR VERDE
+        // 1. INDICADOR VERDE "ENTRADA CONFIRMADA"
         $pdf->SetFillColor(40, 167, 69);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 14);
@@ -190,45 +185,42 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 10, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
         $pdf->Ln(5);
 
-        // TEXTOS DEL EVENTO
+        // 2. TEXTOS DEL EVENTO
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
 
-        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetFont('helvetica', '', 11);
         $pdf->SetTextColor(80, 80, 80);
         $pdf->MultiCell(0, 5, $ubicacion, 0, 'C');
         $pdf->MultiCell(0, 5, $fecha_evento, 0, 'C');
-        $pdf->Ln(6);
+        $pdf->Ln(8);
 
-        // DATOS DEL ASISTENTE
+        // 3. DATOS DEL ASISTENTE
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', '', 10);
         $pdf->SetX(40); $pdf->Write(6, 'Empresa: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_empresa, 0, 1, 'L');
         $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Nombre: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_completo, 0, 1, 'L');
         $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Cargo: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'L');
 
-        $pdf->Ln(6);
+        $pdf->Ln(8);
         
-        // CÓDIGO QR
+        // 4. CÓDIGO QR
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(100, 100, 100);
         $pdf->Cell(0, 5, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         
         $qr_size = 55;
-        // Si al poner el QR vamos a saltar de página, forzamos un poco el espacio
-        if ($pdf->GetY() + $qr_size > 280) {
-            $qr_size = 45; // Lo hacemos más pequeño si no cabe
-        }
         $pdf->Image($qr_path, (210 - $qr_size) / 2, $pdf->GetY() + 2, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
+        // Guardar PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         @unlink($qr_path);
 
-        // REGISTRO ORIGINAL INTACTO
+        // Registro Local (Lógica original)
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
             $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'cargo' => $cargo_persona, 'fecha_hora' => current_time('mysql')];
@@ -281,4 +273,3 @@ add_action('admin_menu', function() {
         echo '</div>';
     });
 });
-?>
