@@ -295,8 +295,24 @@ add_action('template_redirect', function(){
             }
         }
 
-        echo "<div style='text-align:center; font-family:sans-serif; padding-top:50px;'>";
-        echo "<h1 style='color:#28a745;'>Check-in confirmado ✅</h1>";
+        echo '<style>
+            .ecqr-checkin {
+                max-width: 900px;
+                margin: min(60vh,400px) auto 40px;
+                padding: 20px;
+                text-align: center;
+                font-family: sans-serif;
+                background: rgba(255,255,255,0.95);
+                box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+                border-radius: 6px;
+                position: relative;
+                z-index: 9999;
+            }
+            .ecqr-checkin h1 { color:#28a745; margin: 0 0 10px; }
+            @media(max-width:600px){ .ecqr-checkin{margin: 20vh auto 20px; padding:15px;} }
+        </style>';
+        echo "<div class='ecqr-checkin'>";
+        echo "<h1>Check-in confirmado ✅</h1>";
         echo "<h2>Bienvenido, " . esc_html($nombre) . "</h2>";
         echo "<p><strong>Evento:</strong> " . esc_html($evento) . "</p>";
         echo "</div>";
