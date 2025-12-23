@@ -159,10 +159,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         $pdf->SetMargins(0, 0, 0); 
-        $pdf->SetAutoPageBreak(false); // Desactivamos momentáneamente para controlar el espacio
+        $pdf->SetAutoPageBreak(true, 15); // Re-activamos pero con margen inferior
         $pdf->AddPage();
 
-        $y_pos = 15; // Margen inicial si no hay imagen
+        $y_pos = 15; 
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -170,12 +170,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
                     list($w_orig, $h_orig) = getimagesize($imagen_info['path']);
-                    $h_pdf = ($h_orig * 210) / $w_orig;
-                    // Limitamos la altura de la imagen si es demasiado grande para que quepa todo en una página
-                    if ($h_pdf > 100) $h_pdf = 100; 
-                    
-                    $pdf->Image($imagen_info['path'], 0, 0, 210, $h_pdf, '', '', 'T', false, 300);
-                    $y_pos = $h_pdf + 8;
+                    // CÁLCULO DE PROPORCIÓN REAL:
+                    // Dejamos la altura en 0 para que TCPDF calcule automáticamente la proporción 
+                    // basándose en el ancho de 210mm y el archivo original.
+                    $pdf->Image($imagen_info['path'], 0, 0, 210, 0, '', '', 'T', false, 300);
+                    $y_pos = $pdf->GetY() + 8; // GetY() nos da dónde terminó de dibujarse la imagen
                 }
             }
         }
@@ -203,33 +202,33 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 5, $fecha_evento, 0, 'C');
         $pdf->Ln(6);
 
-        // DATOS DEL ASISTENTE (Compactados)
+        // DATOS DEL ASISTENTE
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', '', 10);
-        $line_h = 6;
-        $label_w = 30;
-        
-        $pdf->SetX(40); $pdf->Cell($label_w, $line_h, 'Empresa:'); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, $line_h, $nombre_empresa, 0, 1);
-        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Cell($label_w, $line_h, 'Nombre:'); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, $line_h, $nombre_completo, 0, 1);
-        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Cell($label_w, $line_h, 'Cargo:'); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, $line_h, $cargo_persona, 0, 1);
+        $pdf->SetX(40); $pdf->Write(6, 'Empresa: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_empresa, 0, 1, 'L');
+        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Nombre: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_completo, 0, 1, 'L');
+        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Cargo: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'L');
 
-        $pdf->Ln(5);
+        $pdf->Ln(6);
         
-        // CÓDIGO QR (Justo debajo del texto)
+        // CÓDIGO QR
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(100, 100, 100);
         $pdf->Cell(0, 5, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
         
-        // QR un poco más pequeño (50mm) para asegurar que no salte de página
-        $qr_size = 50;
-        $pdf->Image($qr_path, (210 - $qr_size) / 2, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $qr_size = 55;
+        // Si al poner el QR vamos a saltar de página, forzamos un poco el espacio
+        if ($pdf->GetY() + $qr_size > 280) {
+            $qr_size = 45; // Lo hacemos más pequeño si no cabe
+        }
+        $pdf->Image($qr_path, (210 - $qr_size) / 2, $pdf->GetY() + 2, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         @unlink($qr_path);
 
-        // REGISTRO DE ASISTENTE (Lógica original)
+        // REGISTRO ORIGINAL INTACTO
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
             $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'cargo' => $cargo_persona, 'fecha_hora' => current_time('mysql')];
