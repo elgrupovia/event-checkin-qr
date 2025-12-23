@@ -170,11 +170,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        $pdf->SetMargins(20, 0, 20);
+        $pdf->SetMargins(30, 0, 30);
         $pdf->SetAbsY($y_dinamica);
 
         // === INDICADOR "ENTRADA CONFIRMADA" ===
-        $badge_w = 160;
+        $badge_w = 150;
         $badge_h = 10;
         $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
@@ -201,56 +201,56 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($badge_x + 18, $badge_y);
         $pdf->Cell($badge_w - 18, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
-        $pdf->Ln(15);
+        $pdf->Ln(13);
 
         // === TÍTULO DEL EVENTO ===
         $pdf->SetTextColor(33, 33, 33);
-        $pdf->SetFont('helvetica', 'B', 20);
-        $pdf->MultiCell(0, 9, $titulo_a_mostrar, 0, 'L');
-        $pdf->Ln(3);
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(2);
 
         // === FECHA Y UBICACIÓN ===
-        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetFont('helvetica', '', 9);
         $pdf->SetTextColor(100, 100, 100);
         
         // Icono calendario + fecha
-        $pdf->SetFont('zapfdingbats', '', 11);
-        $pdf->Write(5, '❑'); // icono calendario
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Write(5, '  ' . $fecha_evento);
-        $pdf->Ln(5);
+        $pdf->SetFont('zapfdingbats', '', 10);
+        $pdf->Write(4, '❑'); // icono calendario
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Write(4, '  ' . $fecha_evento);
+        $pdf->Ln(4);
 
         // Icono ubicación + dirección
-        $pdf->SetFont('zapfdingbats', '', 11);
-        $pdf->Write(5, '▼'); // icono ubicación
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->Write(5, '  ' . $ubicacion);
-        $pdf->Ln(8);
+        $pdf->SetFont('zapfdingbats', '', 10);
+        $pdf->Write(4, '▼'); // icono ubicación
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Write(4, '  ' . $ubicacion);
+        $pdf->Ln(6);
 
         // === SEPARADOR ===
         $pdf->SetDrawColor(220, 220, 220);
         $pdf->SetLineWidth(0.3);
-        $pdf->Line(20, $pdf->GetY(), 190, $pdf->GetY());
-        $pdf->Ln(8);
+        $pdf->Line(30, $pdf->GetY(), 180, $pdf->GetY());
+        $pdf->Ln(6);
 
         // === SECCIÓN "NOMBRE" ===
         $pdf->SetTextColor(120, 120, 120);
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->Cell(0, 5, 'NOMBRE', 0, 1, 'L');
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->Cell(0, 4, 'NOMBRE', 0, 1, 'C');
         $pdf->SetTextColor(210, 180, 60); // Color dorado/mostaza
-        $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->MultiCell(0, 9, $nombre_completo, 0, 'L');
-        $pdf->Ln(5);
+        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
+        $pdf->Ln(3);
 
         // === DATOS ADICIONALES (opcional) ===
         $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->Cell(0, 5, 'Empresa: ' . $nombre_empresa, 0, 1, 'L');
-        $pdf->Cell(0, 5, 'Cargo: ' . $cargo_persona, 0, 1, 'L');
-        $pdf->Ln(10);
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->Cell(0, 4, 'Empresa: ' . $nombre_empresa, 0, 1, 'C');
+        $pdf->Cell(0, 4, 'Cargo: ' . $cargo_persona, 0, 1, 'C');
+        $pdf->Ln(6);
 
         // === CÓDIGO QR ===
-        $qr_size = 70;
+        $qr_size = 60;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
