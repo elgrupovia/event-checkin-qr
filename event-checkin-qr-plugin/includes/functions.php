@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.5
+ * Version: 1.6
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -153,8 +153,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(0, 0, 0); 
         $pdf->AddPage();
 
-        $y_dinamica = 15;
+        $y_dinamica = 20;
 
+        // IMAGEN DE CABECERA (si existe)
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -164,70 +165,94 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $ancho_pdf = 210; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
                     $pdf->Image($imagen_info['path'], 0, 0, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    $y_dinamica = $alto_pdf + 10;
+                    $y_dinamica = $alto_pdf + 15;
                 }
             }
         }
 
-        $pdf->SetMargins(15, 0, 15);
+        $pdf->SetMargins(20, 0, 20);
         $pdf->SetAbsY($y_dinamica);
 
-        // --- DISEÑO DEL INDICADOR---
-        $rect_w = 140;
-        $rect_h = 14;
-        $rect_x = (210 - $rect_w) / 2;
-        $rect_y = $pdf->GetY();
+        // === INDICADOR "ENTRADA CONFIRMADA" ===
+        $badge_w = 160;
+        $badge_h = 10;
+        $badge_x = (210 - $badge_w) / 2;
+        $badge_y = $pdf->GetY();
 
-        // 1. Fondo verde clarito
-        $pdf->SetFillColor(240, 255, 240); 
-        // 2. Borde verde oscuro
-        $pdf->SetDrawColor(40, 140, 70);
-        $pdf->SetLineWidth(0.8);
-        $pdf->RoundedRect($rect_x, $rect_y, $rect_w, $rect_h, 7, '1111', 'DF');
+        // Fondo verde (#00C853 aprox)
+        $pdf->SetFillColor(0, 200, 83);
+        $pdf->Rect($badge_x, $badge_y, $badge_w, $badge_h, 'F');
 
-        // 3. Icono de Check (Círculo Verde)
-        $pdf->SetFillColor(40, 160, 80);
-        $pdf->Circle($rect_x + 10, $rect_y + ($rect_h / 2), 4, 0, 360, 'F');
+        // Círculo blanco con check
+        $circle_x = $badge_x + 8;
+        $circle_y = $badge_y + ($badge_h / 2);
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->Circle($circle_x, $circle_y, 3.5, 0, 360, 'F');
+        
+        // Check verde
+        $pdf->SetTextColor(0, 200, 83);
+        $pdf->SetFont('zapfdingbats', '', 12);
+        $pdf->SetXY($circle_x - 2, $circle_y - 3);
+        $pdf->Cell(4, 6, '4', 0, 0, 'C'); // símbolo check
+
+        // Texto "ENTRADA CONFIRMADA"
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($rect_x + 8.2, $rect_y + 4.5);
-        $pdf->Cell(4, 5, '✔', 0, 0, 'C');
+        $pdf->SetXY($badge_x + 18, $badge_y);
+        $pdf->Cell($badge_w - 18, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
-        // 4. Texto "ENTRADA CONFIRMADA"
-        $pdf->SetTextColor(40, 120, 60);
-        $pdf->SetFont('helvetica', 'B', 15);
-        $pdf->SetXY($rect_x + 15, $rect_y);
-        $pdf->Cell($rect_w - 15, $rect_h, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->Ln(15);
+
+        // === TÍTULO DEL EVENTO ===
+        $pdf->SetTextColor(33, 33, 33);
+        $pdf->SetFont('helvetica', 'B', 20);
+        $pdf->MultiCell(0, 9, $titulo_a_mostrar, 0, 'L');
+        $pdf->Ln(3);
+
+        // === FECHA Y UBICACIÓN ===
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetTextColor(100, 100, 100);
         
+        // Icono calendario + fecha
+        $pdf->SetFont('zapfdingbats', '', 11);
+        $pdf->Write(5, '❑'); // icono calendario
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->Write(5, '  ' . $fecha_evento);
         $pdf->Ln(5);
 
-        // --- RESTO DEL CONTENIDO ---
-        $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('helvetica', 'B', 18);
-        $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(2);
-
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->SetTextColor(80, 80, 80);
-        $pdf->MultiCell(0, 5, $ubicacion, 0, 'C');
-        $pdf->MultiCell(0, 5, $fecha_evento, 0, 'C');
-        $pdf->Ln(8);
-
-        // Datos Asistente
-        $pdf->SetTextColor(0, 0, 0);
+        // Icono ubicación + dirección
+        $pdf->SetFont('zapfdingbats', '', 11);
+        $pdf->Write(5, '▼'); // icono ubicación
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetX(40); $pdf->Write(6, 'Empresa: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_empresa, 0, 1, 'L');
-        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Nombre: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_completo, 0, 1, 'L');
-        $pdf->SetX(40); $pdf->SetFont('helvetica', '', 10); $pdf->Write(6, 'Cargo: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'L');
-
+        $pdf->Write(5, '  ' . $ubicacion);
         $pdf->Ln(8);
-        
-        // QR
-        $pdf->SetFont('helvetica', 'B', 9);
-        $pdf->SetTextColor(100, 100, 100);
-        $pdf->Cell(0, 5, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
-        $qr_size = 55;
-        $pdf->Image($qr_path, (210 - $qr_size) / 2, $pdf->GetY() + 2, $qr_size, $qr_size, 'PNG', '', '', true, 300);
+
+        // === SEPARADOR ===
+        $pdf->SetDrawColor(220, 220, 220);
+        $pdf->SetLineWidth(0.3);
+        $pdf->Line(20, $pdf->GetY(), 190, $pdf->GetY());
+        $pdf->Ln(8);
+
+        // === SECCIÓN "NOMBRE" ===
+        $pdf->SetTextColor(120, 120, 120);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell(0, 5, 'NOMBRE', 0, 1, 'L');
+        $pdf->SetTextColor(210, 180, 60); // Color dorado/mostaza
+        $pdf->SetFont('helvetica', 'B', 18);
+        $pdf->MultiCell(0, 9, $nombre_completo, 0, 'L');
+        $pdf->Ln(5);
+
+        // === DATOS ADICIONALES (opcional) ===
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell(0, 5, 'Empresa: ' . $nombre_empresa, 0, 1, 'L');
+        $pdf->Cell(0, 5, 'Cargo: ' . $cargo_persona, 0, 1, 'L');
+        $pdf->Ln(10);
+
+        // === CÓDIGO QR ===
+        $qr_size = 70;
+        $qr_x = (210 - $qr_size) / 2;
+        $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
