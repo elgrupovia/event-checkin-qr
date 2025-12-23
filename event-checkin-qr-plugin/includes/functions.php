@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.4
+ * Version: 1.5
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -153,39 +153,55 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(0, 0, 0); 
         $pdf->AddPage();
 
-        $y_dinamica = 15; // Margen si no hay foto
+        $y_dinamica = 15;
 
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
-                    // Obtener dimensiones reales para calcular altura y evitar solapamiento
                     list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
                     $ancho_pdf = 210; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
-
                     $pdf->Image($imagen_info['path'], 0, 0, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    
-                    // Empujamos el cursor debajo de la imagen + margen de seguridad
                     $y_dinamica = $alto_pdf + 10;
                 }
             }
         }
 
-        // Aplicar márgenes para el texto y situar cursor debajo de la imagen
         $pdf->SetMargins(15, 0, 15);
         $pdf->SetAbsY($y_dinamica);
 
-        // 1. INDICADOR VERDE "ENTRADA CONFIRMADA"
-        $pdf->SetFillColor(40, 167, 69);
+        // --- DISEÑO DEL INDICADOR---
+        $rect_w = 140;
+        $rect_h = 14;
+        $rect_x = (210 - $rect_w) / 2;
+        $rect_y = $pdf->GetY();
+
+        // 1. Fondo verde clarito
+        $pdf->SetFillColor(240, 255, 240); 
+        // 2. Borde verde oscuro
+        $pdf->SetDrawColor(40, 140, 70);
+        $pdf->SetLineWidth(0.8);
+        $pdf->RoundedRect($rect_x, $rect_y, $rect_w, $rect_h, 7, '1111', 'DF');
+
+        // 3. Icono de Check (Círculo Verde)
+        $pdf->SetFillColor(40, 160, 80);
+        $pdf->Circle($rect_x + 10, $rect_y + ($rect_h / 2), 4, 0, 360, 'F');
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->RoundedRect(55, $pdf->GetY(), 100, 10, 2, '1111', 'F');
-        $pdf->Cell(0, 10, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY($rect_x + 8.2, $rect_y + 4.5);
+        $pdf->Cell(4, 5, '✔', 0, 0, 'C');
+
+        // 4. Texto "ENTRADA CONFIRMADA"
+        $pdf->SetTextColor(40, 120, 60);
+        $pdf->SetFont('helvetica', 'B', 15);
+        $pdf->SetXY($rect_x + 15, $rect_y);
+        $pdf->Cell($rect_w - 15, $rect_h, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        
         $pdf->Ln(5);
 
-        // 2. TEXTOS DEL EVENTO
+        // --- RESTO DEL CONTENIDO ---
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', 'B', 18);
         $pdf->MultiCell(0, 8, $titulo_a_mostrar, 0, 'C');
@@ -197,7 +213,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 5, $fecha_evento, 0, 'C');
         $pdf->Ln(8);
 
-        // 3. DATOS DEL ASISTENTE
+        // Datos Asistente
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('helvetica', '', 10);
         $pdf->SetX(40); $pdf->Write(6, 'Empresa: '); $pdf->SetFont('helvetica', 'B', 10); $pdf->Cell(0, 6, $nombre_empresa, 0, 1, 'L');
@@ -206,21 +222,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->Ln(8);
         
-        // 4. CÓDIGO QR
+        // QR
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetTextColor(100, 100, 100);
         $pdf->Cell(0, 5, 'CÓDIGO DE ESCANEO', 0, 1, 'C');
-        
         $qr_size = 55;
         $pdf->Image($qr_path, (210 - $qr_size) / 2, $pdf->GetY() + 2, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // Guardar PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         @unlink($qr_path);
 
-        // Registro Local (Lógica original)
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
             $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'cargo' => $cargo_persona, 'fecha_hora' => current_time('mysql')];
