@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.6
+ * Version: 1.7
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -127,8 +127,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $titulo_a_mostrar = html_entity_decode($titulo_a_mostrar, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
-        $fecha_evento = get_post_meta($post_id, 'fecha', true);
-        if (is_numeric($fecha_evento)) $fecha_evento = date('d/m/Y H:i', $fecha_evento);
+        $fecha_raw = get_post_meta($post_id, 'fecha', true);
+        $fecha_evento = is_numeric($fecha_raw) ? date('d/m/Y H:i', $fecha_raw) : $fecha_raw;
 
         // QR URL
         $base_url = home_url('/checkin/');
@@ -155,7 +155,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 20;
 
-        // IMAGEN DE CABECERA (si existe)
+        // IMAGEN DE CABECERA
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -178,24 +178,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $badge_h = 10;
         $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
-
-        // Fondo verde (#00C853 aprox)
         $pdf->SetFillColor(0, 200, 83);
         $pdf->Rect($badge_x, $badge_y, $badge_w, $badge_h, 'F');
 
-        // Círculo blanco con check
         $circle_x = $badge_x + 8;
         $circle_y = $badge_y + ($badge_h / 2);
         $pdf->SetFillColor(255, 255, 255);
         $pdf->Circle($circle_x, $circle_y, 3.5, 0, 360, 'F');
         
-        // Check verde
         $pdf->SetTextColor(0, 200, 83);
         $pdf->SetFont('zapfdingbats', '', 12);
         $pdf->SetXY($circle_x - 2, $circle_y - 3);
-        $pdf->Cell(4, 6, '4', 0, 0, 'C'); // símbolo check
+        $pdf->Cell(4, 6, '4', 0, 0, 'C'); 
 
-        // Texto "ENTRADA CONFIRMADA"
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->SetXY($badge_x + 18, $badge_y);
@@ -203,29 +198,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->Ln(13);
 
-        // === TÍTULO DEL EVENTO (discreto) ===
+        // === TÍTULO DEL EVENTO ===
         $pdf->SetTextColor(140, 140, 140);
         $pdf->SetFont('helvetica', '', 11);
         $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
-
-        // === FECHA Y UBICACIÓN ===
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetTextColor(100, 100, 100);
-        
-        // Icono calendario + fecha
-        $pdf->SetFont('zapfdingbats', '', 10);
-        $pdf->Write(4, '❑'); // icono calendario
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->Write(4, '  ' . $fecha_evento);
-        $pdf->Ln(4);
-
-        // Icono ubicación + dirección
-        $pdf->SetFont('zapfdingbats', '', 10);
-        $pdf->Write(4, '▼'); // icono ubicación
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->Write(4, '  ' . $ubicacion);
-        $pdf->Ln(6);
 
         // === SEPARADOR ===
         $pdf->SetDrawColor(220, 220, 220);
@@ -233,33 +210,45 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Line(30, $pdf->GetY(), 180, $pdf->GetY());
         $pdf->Ln(6);
 
+        // === INFORMACIÓN DEL EVENTO (CENTRADAY FORMATEADA) ===
+        $pdf->SetTextColor(80, 80, 80);
+        $pdf->SetFont('helvetica', '', 10);
+        $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
+        $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
+        $pdf->Ln(6);
+
         // === SECCIÓN "NOMBRE" ===
         $pdf->SetTextColor(120, 120, 120);
         $pdf->SetFont('helvetica', '', 8);
-        $pdf->Cell(0, 4, 'NOMBRE', 0, 1, 'C');
-        $pdf->SetTextColor(210, 180, 60); // Color dorado/mostaza
-        $pdf->SetFont('helvetica', 'B', 16);
-        $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
+        $pdf->Cell(0, 4, 'ASISTENTE', 0, 1, 'C');
+        
+        $pdf->SetTextColor(210, 180, 60); 
+        $pdf->SetFont('helvetica', 'B', 18); // Nombre más grande
+        $pdf->MultiCell(0, 10, $nombre_completo, 0, 'C');
         $pdf->Ln(3);
 
-        // === EMPRESA Y CARGO (sin etiquetas) ===
+        // === EMPRESA Y CARGO (VISIBILIDAD MEJORADA) ===
+        $pdf->SetTextColor(40, 40, 40);
+        $pdf->SetFont('helvetica', 'B', 13); // Empresa más grande y negrita
+        $pdf->Cell(0, 7, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
+        
         $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetFont('helvetica', '', 9);
-        $pdf->Cell(0, 4, $nombre_empresa, 0, 1, 'C');
-        $pdf->SetFont('helvetica', '', 8);
-        $pdf->Cell(0, 4, $cargo_persona, 0, 1, 'C');
-        $pdf->Ln(6);
+        $pdf->SetFont('helvetica', '', 11); // Cargo más grande
+        $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'C');
+        $pdf->Ln(8);
 
         // === CÓDIGO QR ===
         $qr_size = 60;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
+        // Salida del PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
+        
+        // Limpieza y registro
         @unlink($qr_path);
-
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
             $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'cargo' => $cargo_persona, 'fecha_hora' => current_time('mysql')];
@@ -304,9 +293,18 @@ add_action('admin_menu', function() {
             $asistentes = get_post_meta($e->ID, '_asistentes', true) ?: [];
             echo "<h2>" . esc_html($e->post_title) . "</h2>";
             if (!empty($asistentes)) {
-                echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th></tr></thead><tbody>';
-                foreach ($asistentes as $a) echo "<tr><td>".esc_html($a['nombre'])."</td><td>".esc_html($a['empresa'])."</td></tr>";
+                echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th><th>Cargo</th><th>Fecha</th></tr></thead><tbody>';
+                foreach ($asistentes as $a) {
+                    echo "<tr>
+                            <td>".esc_html($a['nombre'])."</td>
+                            <td>".esc_html($a['empresa'])."</td>
+                            <td>".esc_html($a['cargo'] ?? '-')."</td>
+                            <td>".esc_html($a['fecha_hora'] ?? '-')."</td>
+                          </tr>";
+                }
                 echo '</tbody></table>';
+            } else {
+                echo "<p>No hay asistentes registrados para este evento.</p>";
             }
         }
         echo '</div>';
