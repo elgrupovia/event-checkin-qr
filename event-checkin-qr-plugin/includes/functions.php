@@ -150,105 +150,121 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
-        $pdf->SetMargins(10, 10, 10); 
+        $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
-        // Fondo con esquinas redondeadas (color azul oscuro atractivo)
-        $pdf->SetFillColor(15, 30, 80);
-        $pdf->RoundedRect(10, 10, 190, 277, 5, '1111', 'F');
+        // Fondo principal con esquinas redondeadas (gris claro premium)
+        $pdf->SetFillColor(245, 245, 247);
+        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
         
-        // Fondo blanco interior
-        $pdf->SetFillColor(255, 255, 255);
-        $pdf->RoundedRect(12, 12, 186, 273, 4, '1111', 'F');
+        // Borde decorativo
+        $pdf->SetDrawColor(200, 200, 205);
+        $pdf->SetLineWidth(0.5);
+        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', '');
 
-        $y_dinamica = 20;
+        $y_dinamica = 18;
 
-        // IMAGEN DE CABECERA
+        // IMAGEN DE CABECERA CON ESQUINAS REDONDEADAS
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
                     list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
-                    $ancho_pdf = 190; 
+                    $ancho_pdf = 180; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
-                    $pdf->Image($imagen_info['path'], 10, 15, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    $y_dinamica = 15 + $alto_pdf + 10;
+                    
+                    // Crear máscara redondeada para imagen
+                    $pdf->SetDrawColor(200, 200, 205);
+                    $pdf->SetLineWidth(0.3);
+                    $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 4, '1111', '');
+                    
+                    $pdf->Image($imagen_info['path'], 15, $y_dinamica, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    $y_dinamica = $y_dinamica + $alto_pdf + 8;
                 }
             }
         }
 
-        $pdf->SetMargins(30, 0, 30);
+        $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === INDICADOR "ENTRADA CONFIRMADA" ===
-        $badge_w = 150;
-        $badge_h = 10;
+        // === INDICADOR "ENTRADA CONFIRMADA" (Mejorado) ===
+        $badge_w = 160;
+        $badge_h = 12;
         $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
-        $pdf->SetFillColor(0, 200, 83);
-        $pdf->Rect($badge_x, $badge_y, $badge_w, $badge_h, 'F');
+        
+        // Fondo del badge con esquinas redondeadas
+        $pdf->SetFillColor(76, 175, 80); // Verde más moderno
+        $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
 
+        // Círculo blanco con checkmark
         $circle_x = $badge_x + 8;
         $circle_y = $badge_y + ($badge_h / 2);
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->Circle($circle_x, $circle_y, 3.5, 0, 360, 'F');
+        $pdf->Circle($circle_x, $circle_y, 4, 0, 360, 'F');
         
-        $pdf->SetTextColor(0, 200, 83);
-        $pdf->SetFont('zapfdingbats', '', 12);
-        $pdf->SetXY($circle_x - 2, $circle_y - 3);
-        $pdf->Cell(4, 6, '4', 0, 0, 'C'); 
+        $pdf->SetTextColor(76, 175, 80);
+        $pdf->SetFont('zapfdingbats', '', 13);
+        $pdf->SetXY($circle_x - 2.5, $circle_y - 3.5);
+        $pdf->Cell(5, 7, '4', 0, 0, 'C'); 
 
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($badge_x + 18, $badge_y);
-        $pdf->Cell($badge_w - 18, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetXY($badge_x + 15, $badge_y + 1);
+        $pdf->Cell($badge_w - 15, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
-        $pdf->Ln(13);
+        $pdf->Ln(14);
 
         // === TÍTULO DEL EVENTO ===
-        $pdf->SetTextColor(140, 140, 140);
-        $pdf->SetFont('helvetica', '', 11);
+        $pdf->SetTextColor(100, 100, 105);
+        $pdf->SetFont('helvetica', '', 12);
         $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
 
-        // === SEPARADOR ===
-        $pdf->SetDrawColor(220, 220, 220);
-        $pdf->SetLineWidth(0.3);
-        $pdf->Line(30, $pdf->GetY(), 180, $pdf->GetY());
+        // === SEPARADOR DECORATIVO ===
+        $pdf->SetDrawColor(200, 200, 210);
+        $pdf->SetLineWidth(0.4);
+        $pdf->Line(25, $pdf->GetY(), 185, $pdf->GetY());
         $pdf->Ln(6);
 
-        // === INFORMACIÓN DEL EVENTO (CENTRADAY FORMATEADA) ===
-        $pdf->SetTextColor(80, 80, 80);
+        // === INFORMACIÓN DEL EVENTO ===
+        $pdf->SetTextColor(120, 120, 125);
         $pdf->SetFont('helvetica', '', 10);
         $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
         $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
         $pdf->Ln(6);
 
-        // === SECCIÓN "NOMBRE" ===
-        $pdf->SetTextColor(120, 120, 120);
+        // === SECCIÓN "ASISTENTE" ===
+        $pdf->SetTextColor(150, 150, 155);
         $pdf->SetFont('helvetica', '', 8);
         $pdf->Cell(0, 4, 'ASISTENTE', 0, 1, 'C');
         
-        $pdf->SetTextColor(210, 180, 60); 
-        $pdf->SetFont('helvetica', 'B', 18); // Nombre más grande
+        $pdf->SetTextColor(60, 60, 65); 
+        $pdf->SetFont('helvetica', 'B', 20); // Nombre prominente
         $pdf->MultiCell(0, 10, $nombre_completo, 0, 'C');
         $pdf->Ln(3);
 
-        // === EMPRESA Y CARGO (VISIBILIDAD MEJORADA) ===
-        $pdf->SetTextColor(40, 40, 40);
-        $pdf->SetFont('helvetica', 'B', 13); // Empresa más grande y negrita
+        // === EMPRESA Y CARGO ===
+        $pdf->SetTextColor(70, 70, 75);
+        $pdf->SetFont('helvetica', 'B', 14); // Empresa destacada
         $pdf->Cell(0, 7, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
         
-        $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetFont('helvetica', '', 11); // Cargo más grande
+        $pdf->SetTextColor(110, 110, 115);
+        $pdf->SetFont('helvetica', '', 11); // Cargo legible
         $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'C');
         $pdf->Ln(8);
 
         // === CÓDIGO QR ===
         $qr_size = 60;
         $qr_x = (210 - $qr_size) / 2;
-        $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $qr_y = $pdf->GetY();
+        
+        // Fondo para QR con esquinas redondeadas
+        $pdf->SetFillColor(250, 250, 251);
+        $pdf->RoundedRect($qr_x - 5, $qr_y - 2, $qr_size + 10, $qr_size + 4, 3, '1111', 'F');
+        
+        $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
         // Salida del PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
