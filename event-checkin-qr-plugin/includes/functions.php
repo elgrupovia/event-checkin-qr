@@ -185,21 +185,26 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === BADGE CONFIRMACIÓN CON TICK (✓) ===
-        $badge_w = 160; $badge_h = 11;
-        $badge_x = (210 - $badge_w) / 2;
+       // === BADGE CONFIRMACIÓN CON TICK (✓) ===
+        $badge_w = 80; // Reducido de 160 a 80
+        $badge_h = 10;
+        $badge_x = (210 - $badge_w) / 2; // Centrado automático basado en el nuevo ancho
         $badge_y = $pdf->GetY();
+        
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
         
+        // Tick (✓)
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('zapfdingbats', '', 12);
-        $pdf->SetXY($badge_x + 45, $badge_y + 1); 
-        $pdf->Cell(10, $badge_h, '4', 0, 0, 'R'); 
+        // Ajustamos la X del tick para que esté pegado al texto en el centro
+        $pdf->SetXY($badge_x + 5, $badge_y + 0.5); 
+        $pdf->Cell(10, $badge_h, '4', 0, 0, 'L'); 
 
-        $pdf->SetFont('helvetica', 'B', 11);
+        // Texto "ENTRADA CONFIRMADA"
+        $pdf->SetFont('helvetica', 'B', 10);
         $pdf->SetXY($badge_x, $badge_y);
-        $pdf->Cell($badge_w, $badge_h, '    ENTRADA CONFIRMADA', 0, 0, 'C'); 
+        $pdf->Cell($badge_w, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'C'); 
         $pdf->Ln(15);
 
         // === TÍTULO Y SEPARADOR ===
