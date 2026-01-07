@@ -153,9 +153,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(10, 10, 10); 
         $pdf->AddPage();
         
-        // Fondo con esquinas redondeadas
-        $pdf->SetFillColor(255, 255, 255);
+        // Fondo con esquinas redondeadas (color azul oscuro atractivo)
+        $pdf->SetFillColor(15, 30, 80);
         $pdf->RoundedRect(10, 10, 190, 277, 5, '1111', 'F');
+        
+        // Fondo blanco interior
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect(12, 12, 186, 273, 4, '1111', 'F');
 
         $y_dinamica = 20;
 
