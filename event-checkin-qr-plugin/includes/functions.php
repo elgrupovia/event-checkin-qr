@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 8;
 
-        // === IMAGEN CABECERA (ESQUINAS SIMÉTRICAS REDONDEADAS) ===
+        // === IMAGEN CABECERA (ESQUINAS SIMÉTRICAS REDONDEADAS CON CLIPPING) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -175,23 +175,36 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $pdf->SetFillColor(255, 255, 255);
                     $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1100', 'F');
                     
-                    // 2. Crear máscara circular para las esquinas superiores
-                    $pdf->StartTransform();
-                    
-                    // Esquina superior-izquierda
-                    $pdf->SetLineWidth(0);
-                    $pdf->SetDrawColor(245, 245, 247); // Color del fondo del ticket
-                    $pdf->Circle($img_x + $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
-                    
-                    // Esquina superior-derecha
-                    $pdf->Circle($img_x + $ancho_pdf - $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
-                    
-                    $pdf->StopTransform();
-                    
-                    // 3. Insertar imagen con clipping en esquinas redondeadas
+                    // 2. Insertar imagen
                     $pdf->Image($imagen_info['path'], $img_x, $img_y, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                     
-                    // 4. Dibujar borde de las esquinas redondeadas
+                    // 3. Enmascarar las esquinas superiores con un rectángulo gris del fondo
+                    $pdf->SetFillColor(245, 245, 247); // Color del fondo del ticket
+                    $pdf->SetDrawColor(245, 245, 247);
+                    $pdf->SetLineWidth(0);
+                    
+                    // Máscara esquina superior-izquierda
+                    $arc_steps = 20;
+                    $points_izq = [];
+                    for ($i = 0; $i <= $arc_steps; $i++) {
+                        $angle = (M_PI / 2) * ($i / $arc_steps);
+                        $px = $img_x + $radio_esquinas - $radio_esquinas * cos($angle);
+                        $py = $img_y + $radio_esquinas - $radio_esquinas * sin($angle);
+                        $points_izq[] = array($px, $py);
+                    }
+                    $pdf->Polygon($points_izq, 'F');
+                    
+                    // Máscara esquina superior-derecha
+                    $points_der = [];
+                    for ($i = 0; $i <= $arc_steps; $i++) {
+                        $angle = (M_PI / 2) * ($i / $arc_steps);
+                        $px = $img_x + $ancho_pdf - $radio_esquinas + $radio_esquinas * cos($angle);
+                        $py = $img_y + $radio_esquinas - $radio_esquinas * sin($angle);
+                        $points_der[] = array($px, $py);
+                    }
+                    $pdf->Polygon($points_der, 'F');
+                    
+                    // 4. Dibujar borde redondeado final
                     $pdf->SetDrawColor(200, 200, 205);
                     $pdf->SetLineWidth(0.5);
                     $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1100', 'D');
