@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 8;
 
-        // === IMAGEN CABECERA (CORRECCIÓN ESQUINAS REDONDEADAS) ===
+        // === IMAGEN CABECERA (ESQUINAS SIMÉTRICAS REDONDEADAS) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -165,14 +165,38 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
                     $ancho_pdf = 194; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
+                    $radio_esquinas = 6; // Mismo radio que el marco del ticket
                     
+                    // Coordenadas de la imagen
+                    $img_x = 8;
+                    $img_y = 8;
+                    
+                    // 1. Dibujar fondo blanco con esquinas redondeadas (contenedor)
+                    $pdf->SetFillColor(255, 255, 255);
+                    $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1100', 'F');
+                    
+                    // 2. Crear máscara circular para las esquinas superiores
                     $pdf->StartTransform();
-                    // '1100' indica esquinas superior-izquierda y superior-derecha redondeadas
-                    $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1100', 'CNZ');
-                    $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    
+                    // Esquina superior-izquierda
+                    $pdf->SetLineWidth(0);
+                    $pdf->SetDrawColor(245, 245, 247); // Color del fondo del ticket
+                    $pdf->Circle($img_x + $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
+                    
+                    // Esquina superior-derecha
+                    $pdf->Circle($img_x + $ancho_pdf - $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
+                    
                     $pdf->StopTransform();
-
-                    $y_dinamica = 8 + $alto_pdf + 10;
+                    
+                    // 3. Insertar imagen con clipping en esquinas redondeadas
+                    $pdf->Image($imagen_info['path'], $img_x, $img_y, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    
+                    // 4. Dibujar borde de las esquinas redondeadas
+                    $pdf->SetDrawColor(200, 200, 205);
+                    $pdf->SetLineWidth(0.5);
+                    $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1100', 'D');
+                    
+                    $y_dinamica = $img_y + $alto_pdf + 10;
                 }
             }
         }
