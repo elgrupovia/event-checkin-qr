@@ -150,8 +150,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
-        $pdf->SetMargins(0, 0, 0); 
+        $pdf->SetMargins(10, 10, 10); 
         $pdf->AddPage();
+        
+        // Fondo con esquinas redondeadas
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect(10, 10, 190, 277, 5, '1111', 'F');
 
         $y_dinamica = 20;
 
@@ -162,10 +166,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
                     list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
-                    $ancho_pdf = 210; 
+                    $ancho_pdf = 190; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
-                    $pdf->Image($imagen_info['path'], 0, 0, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    $y_dinamica = $alto_pdf + 15;
+                    $pdf->Image($imagen_info['path'], 10, 15, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    $y_dinamica = 15 + $alto_pdf + 10;
                 }
             }
         }
