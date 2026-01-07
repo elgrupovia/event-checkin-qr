@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Incluye imagen redondeada e info de evento ampliada.
- * Version: 1.9
+ * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Incluye imagen con esquinas redondeadas.
+ * Version: 1.8.1
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -150,19 +150,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
+        $pdf->SetAutoPageBreak(false, 0); // Evita el salto de página automático
         $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
+        // Fondo principal
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
         
+        // Borde decorativo
         $pdf->SetDrawColor(200, 200, 205);
         $pdf->SetLineWidth(0.5);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', '');
 
         $y_dinamica = 18;
 
-        // === IMAGEN DE CABECERA REDONDEADA ===
+        // === IMAGEN DE CABECERA CON ESQUINAS REDONDEADAS ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -181,7 +184,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $pdf->SetLineWidth(0.2);
                     $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 5, '1111', 'D');
 
-                    $y_dinamica = $y_dinamica + $alto_pdf + 8;
+                    $y_dinamica = $y_dinamica + $alto_pdf + 6; // Ajustado de 8 a 6
                 }
             }
         }
@@ -189,58 +192,46 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === BADGE ENTRADA CONFIRMADA ===
+        // === INDICADOR "ENTRADA CONFIRMADA" ===
         $badge_w = 160; $badge_h = 12;
         $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
         
+        $circle_x = $badge_x + 8; $circle_y = $badge_y + ($badge_h / 2);
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->Circle($badge_x + 8, $badge_y + 6, 4, 0, 360, 'F');
+        $pdf->Circle($circle_x, $circle_y, 4, 0, 360, 'F');
         
         $pdf->SetTextColor(76, 175, 80);
         $pdf->SetFont('zapfdingbats', '', 13);
-        $pdf->SetXY($badge_x + 5.5, $badge_y + 2.5);
+        $pdf->SetXY($circle_x - 2.5, $circle_y - 3.5);
         $pdf->Cell(5, 7, '4', 0, 0, 'C'); 
 
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetXY($badge_x + 15, $badge_y + 1);
         $pdf->Cell($badge_w - 15, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
-        $pdf->Ln(15);
+        $pdf->Ln(12); // Reducido de 14 a 12
 
-        // === TÍTULO EVENTO ===
-        $pdf->SetTextColor(80, 80, 85);
+        // === CUERPO DE TEXTO ===
+        $pdf->SetTextColor(100, 100, 105);
         $pdf->SetFont('helvetica', '', 11);
-        $pdf->MultiCell(0, 6, "Usted está inscrito en:", 0, 'C');
-        $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(4);
+        $pdf->MultiCell(0, 5, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(2);
 
         $pdf->SetDrawColor(200, 200, 210);
         $pdf->SetLineWidth(0.4);
-        $pdf->Line(40, $pdf->GetY(), 170, $pdf->GetY());
-        $pdf->Ln(8);
+        $pdf->Line(25, $pdf->GetY(), 185, $pdf->GetY());
+        $pdf->Ln(4);
 
-        // === INFORMACIÓN AMPLIADA (FECHA Y LUGAR) ===
-        $pdf->SetTextColor(40, 40, 45); // Color más oscuro para mejor contraste
-        
-        // Fecha
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->Cell(0, 7, "FECHA: " . $fecha_evento, 0, 1, 'C');
-        
-        // Lugar
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->MultiCell(0, 7, "LUGAR: " . $ubicacion, 0, 'C');
-        $pdf->Ln(8);
+        // === FECHA Y LUGAR (LETRA AUMENTADA) ===
+        $pdf->SetTextColor(80, 80, 85);
+        $pdf->SetFont('helvetica', 'B', 13); // Aumentado de 10 a 13 y en negrita
+        $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
+        $pdf->MultiCell(0, 7, $info_evento, 0, 'C');
+        $pdf->Ln(4);
 
-        // Separador sutil antes de datos personales
-        $pdf->SetDrawColor(230, 230, 235);
-        $pdf->Line(60, $pdf->GetY(), 150, $pdf->GetY());
-        $pdf->Ln(6);
-
-        // === DATOS ASISTENTE ===
         $pdf->SetTextColor(150, 150, 155);
         $pdf->SetFont('helvetica', '', 8);
         $pdf->Cell(0, 3, 'ASISTENTE', 0, 1, 'C');
@@ -248,7 +239,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(60, 60, 65); 
         $pdf->SetFont('helvetica', 'B', 18);
         $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
-        $pdf->Ln(2);
+        $pdf->Ln(1);
 
         $pdf->SetTextColor(70, 70, 75);
         $pdf->SetFont('helvetica', 'B', 12);
@@ -257,15 +248,16 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(110, 110, 115);
         $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $cargo_persona, 0, 1, 'C');
-        $pdf->Ln(6);
+        $pdf->Ln(2);
 
-        // === QR ===
-        $qr_size = 75;
+        // === QR (LIGERAMENTE REDUCIDO PARA EVITAR SALTO) ===
+        $qr_size = 75; // Reducido de 80 a 75 para ganar espacio vertical
         $qr_x = (210 - $qr_size) / 2;
-        $qr_y = $pdf->GetY();
+        $qr_y = $pdf->GetY() + 2;
         
         $pdf->SetFillColor(240, 245, 250);
         $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', 'F');
+        
         $pdf->SetDrawColor(76, 175, 80);
         $pdf->SetLineWidth(0.8);
         $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', '');
@@ -309,10 +301,8 @@ add_action('template_redirect', function(){
             ];
             update_post_meta($post_id,'_asistentes',$asistentes);
         }
-        echo "<div style='text-align:center;font-family:sans-serif;margin-top:50px;color:#333;'>";
-        echo "<h1 style='color:#4CAF50;'>Check-in confirmado ✅</h1>";
-        echo "<p style='font-size:1.2em;'>Bienvenido/a: <strong>" . esc_html($nombre) . "</strong></p>";
-        echo "<p>Disfrute del evento: " . esc_html($evento) . "</p>";
+        echo "<div style='text-align:center;font-family:sans-serif;margin-top:50px;'>";
+        echo "<h2>Check-in confirmado ✅</h2><p>Bienvenido/a: <strong>" . esc_html($nombre) . "</strong></p>";
         echo "</div>";
         exit;
     }
