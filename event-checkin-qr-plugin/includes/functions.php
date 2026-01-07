@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 8;
 
-        // === IMAGEN CABECERA (ESQUINAS SIMÉTRICAS REDONDEADAS) ===
+        // === IMAGEN CABECERA (CORRECCIÓN ESQUINAS REDONDEADAS) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -165,38 +165,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
                     $ancho_pdf = 194; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
-                    $radio_esquinas = 6; // Mismo radio que el marco del ticket
                     
-                    // Coordenadas de la imagen
-                    $img_x = 8;
-                    $img_y = 8;
-                    
-                    // 1. Dibujar fondo blanco con esquinas redondeadas (contenedor)
-                    $pdf->SetFillColor(255, 255, 255);
-                    $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1111', 'F');
-                    
-                    // 2. Crear máscara circular para las esquinas superiores
                     $pdf->StartTransform();
-                    
-                    // Esquina superior-izquierda
-                    $pdf->SetLineWidth(0);
-                    $pdf->SetDrawColor(245, 245, 247); // Color del fondo del ticket
-                    $pdf->Circle($img_x + $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
-                    
-                    // Esquina superior-derecha
-                    $pdf->Circle($img_x + $ancho_pdf - $radio_esquinas, $img_y + $radio_esquinas, $radio_esquinas, 0, 360, 'F');
-                    
+                    // '1100' indica esquinas superior-izquierda y superior-derecha redondeadas
+                    $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1100', 'CNZ');
+                    $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                     $pdf->StopTransform();
-                    
-                    // 3. Insertar imagen con clipping en esquinas redondeadas
-                    $pdf->Image($imagen_info['path'], $img_x, $img_y, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    
-                    // 4. Dibujar borde de las esquinas redondeadas
-                    $pdf->SetDrawColor(200, 200, 205);
-                    $pdf->SetLineWidth(0.5);
-                    $pdf->RoundedRect($img_x, $img_y, $ancho_pdf, $alto_pdf, $radio_esquinas, '1111', 'D');
-                    
-                    $y_dinamica = $img_y + $alto_pdf + 10;
+
+                    $y_dinamica = 8 + $alto_pdf + 10;
                 }
             }
         }
@@ -257,12 +233,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Ln(8);
 
         // === QR CON DISEÑO REDONDEADO ===
-        $qr_size = 75;
-        $qr_x = (210 - $qr_size) / 2;
+        $qr_size = 78;
+        $qr_x = (215 - $qr_size) / 2;
         $qr_y = $pdf->GetY();
         
         // Recuadro del QR con esquinas redondeadas
-        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetFillColor(275, 275, 2);
         $pdf->RoundedRect($qr_x - 4, $qr_y - 4, $qr_size + 8, $qr_size + 8, 5, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
