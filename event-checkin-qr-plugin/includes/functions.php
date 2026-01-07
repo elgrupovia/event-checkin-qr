@@ -255,14 +255,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 6, $cargo_persona, 0, 1, 'C');
         $pdf->Ln(8);
 
-        // === CÓDIGO QR ===
-        $qr_size = 60;
+        // === CÓDIGO QR GRANDE Y DESTACADO ===
+        $qr_size = 90; // Aumentado de 60 a 90mm
         $qr_x = (210 - $qr_size) / 2;
         $qr_y = $pdf->GetY();
         
-        // Fondo para QR con esquinas redondeadas
-        $pdf->SetFillColor(250, 250, 251);
-        $pdf->RoundedRect($qr_x - 5, $qr_y - 2, $qr_size + 10, $qr_size + 4, 3, '1111', 'F');
+        // Fondo para QR con esquinas redondeadas - más grande
+        $pdf->SetFillColor(240, 245, 250);
+        $pdf->RoundedRect($qr_x - 8, $qr_y - 4, $qr_size + 16, $qr_size + 8, 5, '1111', 'F');
+        
+        // Borde decorativo alrededor del QR
+        $pdf->SetDrawColor(76, 175, 80);
+        $pdf->SetLineWidth(1);
+        $pdf->RoundedRect($qr_x - 8, $qr_y - 4, $qr_size + 16, $qr_size + 8, 5, '1111', '');
         
         $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
