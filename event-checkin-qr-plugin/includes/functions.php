@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.7
+ * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Incluye imagen con esquinas redondeadas.
+ * Version: 1.8
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -95,12 +95,12 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
     $attachment_id = attachment_url_to_postid($imagen_url);
     if($attachment_id){
         $imagen_meta = wp_get_attachment_metadata($attachment_id);
-        if($imagen_meta){
+        if($imagen_meta && isset($imagen_meta['file'])){
             $imagen_path = $upload_dir['basedir'].'/'.$imagen_meta['file'];
         }
     }
     if(!file_exists($imagen_path) && function_exists('download_url')){
-        $tmp = download_url($imagen_url,300);
+        $tmp = download_url($imagen_url, 300);
         if(!is_wp_error($tmp)) $imagen_path = $tmp;
     }
     return ['path'=>$imagen_path,'tmp'=>$tmp];
@@ -134,10 +134,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $base_url = home_url('/checkin/');
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
-            'nombre' => rawurlencode($nombre_completo),
-            'cargo' => rawurlencode($cargo_persona),
-            'email' => rawurlencode($request['email'] ?? ''), 
-            'evento' => rawurlencode($titulo_a_mostrar),
+            'nombre'  => rawurlencode($nombre_completo),
+            'cargo'   => rawurlencode($cargo_persona),
+            'email'   => rawurlencode($request['email'] ?? ''), 
+            'evento'  => rawurlencode($titulo_a_mostrar),
         ];
         $qr_url = $base_url . '?' . http_build_query($params);
 
@@ -153,7 +153,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
-        // Fondo principal con esquinas redondeadas (gris claro premium)
+        // Fondo principal
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
         
@@ -164,7 +164,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 18;
 
-        // IMAGEN DE CABECERA CON ESQUINAS REDONDEADAS
+        // === IMAGEN DE CABECERA CON ESQUINAS REDONDEADAS (CLIP MASK) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -174,12 +174,20 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $ancho_pdf = 180; 
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
                     
-                    // Crear máscara redondeada para imagen
-                    $pdf->SetDrawColor(200, 200, 205);
-                    $pdf->SetLineWidth(0.3);
-                    $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 4, '1111', '');
-                    
+                    // Iniciamos transformación para el recorte
+                    $pdf->StartTransform();
+                    // Definimos el área de recorte redondeada (modo 'CNZ')
+                    $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 5, '1111', 'CNZ');
+                    // Insertamos la imagen (solo se verá lo que esté dentro del clipping)
                     $pdf->Image($imagen_info['path'], 15, $y_dinamica, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    // Cerramos transformación
+                    $pdf->StopTransform();
+
+                    // Dibujamos un borde fino alrededor para suavizar
+                    $pdf->SetDrawColor(210, 210, 215);
+                    $pdf->SetLineWidth(0.2);
+                    $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 5, '1111', 'D');
+
                     $y_dinamica = $y_dinamica + $alto_pdf + 8;
                 }
             }
@@ -188,19 +196,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === INDICADOR "ENTRADA CONFIRMADA" (Mejorado) ===
-        $badge_w = 160;
-        $badge_h = 12;
+        // === INDICADOR "ENTRADA CONFIRMADA" ===
+        $badge_w = 160; $badge_h = 12;
         $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
-        
-        // Fondo del badge con esquinas redondeadas
-        $pdf->SetFillColor(76, 175, 80); // Verde más moderno
+        $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
-
-        // Círculo blanco con checkmark
-        $circle_x = $badge_x + 8;
-        $circle_y = $badge_y + ($badge_h / 2);
+        
+        $circle_x = $badge_x + 8; $circle_y = $badge_y + ($badge_h / 2);
         $pdf->SetFillColor(255, 255, 255);
         $pdf->Circle($circle_x, $circle_y, 4, 0, 360, 'F');
         
@@ -213,70 +216,62 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetXY($badge_x + 15, $badge_y + 1);
         $pdf->Cell($badge_w - 15, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
-
         $pdf->Ln(14);
 
-        // === TÍTULO DEL EVENTO ===
+        // === CUERPO DE TEXTO ===
         $pdf->SetTextColor(100, 100, 105);
         $pdf->SetFont('helvetica', '', 12);
         $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
         $pdf->Ln(2);
 
-        // === SEPARADOR DECORATIVO ===
         $pdf->SetDrawColor(200, 200, 210);
         $pdf->SetLineWidth(0.4);
         $pdf->Line(25, $pdf->GetY(), 185, $pdf->GetY());
         $pdf->Ln(6);
 
-        // === INFORMACIÓN DEL EVENTO ===
         $pdf->SetTextColor(120, 120, 125);
         $pdf->SetFont('helvetica', '', 10);
         $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
         $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
         $pdf->Ln(6);
 
-        // === SECCIÓN "ASISTENTE" ===
         $pdf->SetTextColor(150, 150, 155);
         $pdf->SetFont('helvetica', '', 8);
         $pdf->Cell(0, 3, 'ASISTENTE', 0, 1, 'C');
         
         $pdf->SetTextColor(60, 60, 65); 
-        $pdf->SetFont('helvetica', 'B', 18); // Nombre prominente - reducido
+        $pdf->SetFont('helvetica', 'B', 18);
         $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
         $pdf->Ln(2);
 
-        // === EMPRESA Y CARGO ===
         $pdf->SetTextColor(70, 70, 75);
-        $pdf->SetFont('helvetica', 'B', 12); // Empresa destacada - reducido
+        $pdf->SetFont('helvetica', 'B', 12);
         $pdf->Cell(0, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
         
         $pdf->SetTextColor(110, 110, 115);
-        $pdf->SetFont('helvetica', '', 10); // Cargo legible - reducido
+        $pdf->SetFont('helvetica', '', 10);
         $pdf->Cell(0, 5, $cargo_persona, 0, 1, 'C');
         $pdf->Ln(4);
 
-        // === CÓDIGO QR GRANDE Y DESTACADO ===
-        $qr_size = 80; // Tamaño optimizado para caber en una página
+        // === QR ===
+        $qr_size = 80;
         $qr_x = (210 - $qr_size) / 2;
         $qr_y = $pdf->GetY();
         
-        // Fondo para QR con esquinas redondeadas - más grande
         $pdf->SetFillColor(240, 245, 250);
         $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', 'F');
         
-        // Borde decorativo alrededor del QR
         $pdf->SetDrawColor(76, 175, 80);
         $pdf->SetLineWidth(0.8);
         $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', '');
         
         $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // Salida del PDF
+        // Guardar PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
         
-        // Limpieza y registro
         @unlink($qr_path);
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
@@ -291,7 +286,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
 /**
  * ---------------------------
- * Registrar QR leídos (Check-in)
+ * Check-in Handler
  * ---------------------------
  */
 add_action('template_redirect', function(){
@@ -301,10 +296,17 @@ add_action('template_redirect', function(){
         $post_id = buscar_evento_robusto($evento);
         if($post_id){
             $asistentes = get_post_meta($post_id,'_asistentes',true) ?: [];
-            $asistentes[] = ['nombre'=>$nombre,'empresa'=>$_GET['empresa'],'cargo'=>$_GET['cargo'],'fecha_hora'=>current_time('mysql')];
+            $asistentes[] = [
+                'nombre' => $nombre,
+                'empresa' => sanitize_text_field($_GET['empresa'] ?? ''),
+                'cargo' => sanitize_text_field($_GET['cargo'] ?? ''),
+                'fecha_hora' => current_time('mysql')
+            ];
             update_post_meta($post_id,'_asistentes',$asistentes);
         }
-        echo "<h2>Check-in confirmado ✅</h2><p>Bienvenido: " . esc_html($nombre) . "</p>";
+        echo "<div style='text-align:center;font-family:sans-serif;margin-top:50px;'>";
+        echo "<h2>Check-in confirmado ✅</h2><p>Bienvenido/a: <strong>" . esc_html($nombre) . "</strong></p>";
+        echo "</div>";
         exit;
     }
 });
