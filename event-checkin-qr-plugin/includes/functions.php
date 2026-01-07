@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM (módulo "Eventos").
- * Version: 1.7
+ * Version: 1.8
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -108,7 +108,7 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 
 /**
  * ---------------------------
- * Generar PDF con QR
+ * Generar PDF con QR - DISEÑO PREMIUM
  * ---------------------------
  */
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
@@ -146,130 +146,159 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
-        // === DISEÑO DEL PDF ===
+        // === DISEÑO DEL PDF PREMIUM ===
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
-        $pdf->SetMargins(8, 8, 8); 
+        $pdf->SetMargins(0, 0, 0); 
         $pdf->AddPage();
         
-        // Fondo principal con esquinas redondeadas (gris claro premium)
-        $pdf->SetFillColor(245, 245, 247);
-        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
+        // SECCIÓN SUPERIOR - IMAGEN CON ESQUINAS REDONDEADAS Y OVERLAY
+        $y_pos = 0;
+        $img_margin = 8;
+        $img_width = 210 - (2 * $img_margin);
+        $img_height = 90;
+        $img_radius = 8;
         
-        // Borde decorativo
-        $pdf->SetDrawColor(200, 200, 205);
-        $pdf->SetLineWidth(0.5);
-        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', '');
-
-        $y_dinamica = 18;
-
-        // IMAGEN DE CABECERA CON ESQUINAS REDONDEADAS
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
-                    list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
-                    $ancho_pdf = 180; 
-                    $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
+                    // Crear fondo redondeado
+                    $pdf->SetFillColor(220, 220, 225);
+                    $pdf->RoundedRect($img_margin, 8, $img_width, $img_height, $img_radius, '1111', 'F');
                     
-                    // Crear máscara redondeada para imagen
-                    $pdf->SetDrawColor(200, 200, 205);
-                    $pdf->SetLineWidth(0.3);
-                    $pdf->RoundedRect(15, $y_dinamica, $ancho_pdf, $alto_pdf, 4, '1111', '');
+                    // Imagen dentro del rectángulo redondeado
+                    $pdf->Image($imagen_info['path'], $img_margin, 8, $img_width, $img_height, '', '', 'T', false, 300);
+                    $y_pos = 8 + $img_height;
                     
-                    $pdf->Image($imagen_info['path'], 15, $y_dinamica, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    $y_dinamica = $y_dinamica + $alto_pdf + 8;
+                    // Overlay oscuro para texto
+                    $pdf->SetDrawColor(0, 0, 0);
+                    $pdf->SetFillColor(0, 0, 0);
+                    $pdf->SetAlpha(0.35);
+                    $pdf->RoundedRect($img_margin, 8, $img_width, $img_height, $img_radius, '1111', 'F');
+                    $pdf->SetAlpha(1);
                 }
             }
         }
-
-        $pdf->SetMargins(25, 0, 25);
-        $pdf->SetAbsY($y_dinamica);
-
-        // === INDICADOR "ENTRADA CONFIRMADA" (Mejorado) ===
-        $badge_w = 160;
-        $badge_h = 12;
-        $badge_x = (210 - $badge_w) / 2;
-        $badge_y = $pdf->GetY();
         
-        // Fondo del badge con esquinas redondeadas
-        $pdf->SetFillColor(76, 175, 80); // Verde más moderno
-        $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
+        if ($y_pos === 0) {
+            $y_pos = 100;
+        }
 
-        // Círculo blanco con checkmark
-        $circle_x = $badge_x + 8;
-        $circle_y = $badge_y + ($badge_h / 2);
+        // === SECCIÓN BLANCA PRINCIPAL ===
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->Circle($circle_x, $circle_y, 4, 0, 360, 'F');
-        
-        $pdf->SetTextColor(76, 175, 80);
-        $pdf->SetFont('zapfdingbats', '', 13);
-        $pdf->SetXY($circle_x - 2.5, $circle_y - 3.5);
-        $pdf->Cell(5, 7, '4', 0, 0, 'C'); 
+        $pdf->Rect(0, $y_pos, 210, 297 - $y_pos, 'F');
 
+        // === LÍNEA DIVISORIA PREMIUM CON GRADIENTE (simulado) ===
+        $pdf->SetDrawColor(100, 180, 220);
+        $pdf->SetLineWidth(3);
+        $pdf->Line(0, $y_pos, 210, $y_pos);
+
+        $y_pos += 8;
+
+        // === BADGE "ENTRADA CONFIRMADA" FLOTANTE ===
+        $badge_y = $y_pos - 12;
+        $badge_x = 15;
+        $badge_w = 60;
+        $badge_h = 10;
+        
+        $pdf->SetFillColor(41, 182, 246); // Azul vibrante
+        $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 2.5, '1111', 'F');
+        
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY($badge_x + 15, $badge_y + 1);
-        $pdf->Cell($badge_w - 15, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'L');
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetXY($badge_x + 2, $badge_y + 1.5);
+        $pdf->Cell($badge_w - 4, $badge_h - 3, '✓ CONFIRMADA', 0, 0, 'C');
 
-        $pdf->Ln(14);
+        // === CONTENIDO PRINCIPAL ===
+        $pdf->SetMargins(20, 0, 20);
+        $pdf->SetY($y_pos + 5);
 
-        // === TÍTULO DEL EVENTO ===
-        $pdf->SetTextColor(100, 100, 105);
-        $pdf->SetFont('helvetica', '', 12);
-        $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
-        $pdf->Ln(2);
+        // Evento título - Principal
+        $pdf->SetTextColor(50, 50, 50);
+        $pdf->SetFont('helvetica', 'B', 16);
+        $pdf->MultiCell(0, 7, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(3);
 
-        // === SEPARADOR DECORATIVO ===
-        $pdf->SetDrawColor(200, 200, 210);
-        $pdf->SetLineWidth(0.4);
-        $pdf->Line(25, $pdf->GetY(), 185, $pdf->GetY());
-        $pdf->Ln(6);
+        // Información evento en línea
+        $pdf->SetTextColor(120, 120, 120);
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->SetXY(20, $pdf->GetY());
+        $info_evento = "📅 " . $fecha_evento . "  |  📍 " . $ubicacion;
+        $pdf->Cell(0, 5, $info_evento, 0, 1, 'C');
+        $pdf->Ln(5);
 
-        // === INFORMACIÓN DEL EVENTO ===
-        $pdf->SetTextColor(120, 120, 125);
-        $pdf->SetFont('helvetica', '', 10);
-        $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
-        $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
-        $pdf->Ln(6);
+        // === DIVISOR DECORATIVO ===
+        $pdf->SetDrawColor(230, 230, 230);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line(40, $pdf->GetY(), 170, $pdf->GetY());
+        $pdf->Ln(5);
 
-        // === SECCIÓN "ASISTENTE" ===
-        $pdf->SetTextColor(150, 150, 155);
+        // === DISEÑO EN DOS COLUMNAS (Izq: Datos, Der: QR) ===
+        
+        // COLUMNA IZQUIERDA - Información Personal
+        $col_left = 20;
+        $col_width = 90;
+        
+        // Título "ASISTENTE"
         $pdf->SetFont('helvetica', '', 8);
-        $pdf->Cell(0, 3, 'ASISTENTE', 0, 1, 'C');
+        $pdf->SetTextColor(150, 150, 150);
+        $pdf->SetXY($col_left, $pdf->GetY());
+        $pdf->Cell($col_width, 4, 'ASISTENTE', 0, 1, 'L');
         
-        $pdf->SetTextColor(60, 60, 65); 
-        $pdf->SetFont('helvetica', 'B', 18); // Nombre prominente - reducido
-        $pdf->MultiCell(0, 8, $nombre_completo, 0, 'C');
+        // Nombre prominente
+        $pdf->SetFont('helvetica', 'B', 19);
+        $pdf->SetTextColor(41, 182, 246); // Azul vibrante
+        $pdf->SetXY($col_left, $pdf->GetY());
+        $pdf->MultiCell($col_width, 8, $nombre_completo, 0, 'L');
         $pdf->Ln(2);
+        
+        // Empresa
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetTextColor(50, 50, 50);
+        $pdf->SetXY($col_left, $pdf->GetY());
+        $pdf->Cell($col_width, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'L');
+        
+        // Cargo
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetTextColor(100, 100, 100);
+        $pdf->SetXY($col_left, $pdf->GetY());
+        $pdf->MultiCell($col_width, 5, $cargo_persona, 0, 'L');
 
-        // === EMPRESA Y CARGO ===
-        $pdf->SetTextColor(70, 70, 75);
-        $pdf->SetFont('helvetica', 'B', 12); // Empresa destacada - reducido
-        $pdf->Cell(0, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
+        // COLUMNA DERECHA - QR Grande y Prominente
+        $qr_size = 75;
+        $qr_x = 125;
+        $col_right_y = $pdf->GetY() - 25;
         
-        $pdf->SetTextColor(110, 110, 115);
-        $pdf->SetFont('helvetica', '', 10); // Cargo legible - reducido
-        $pdf->Cell(0, 5, $cargo_persona, 0, 1, 'C');
-        $pdf->Ln(4);
+        // Fondo con esquinas redondeadas para QR
+        $pdf->SetFillColor(248, 248, 250);
+        $pdf->RoundedRect($qr_x - 3, $col_right_y - 3, $qr_size + 6, $qr_size + 6, 4, '1111', 'F');
+        
+        // Borde elegante
+        $pdf->SetDrawColor(41, 182, 246);
+        $pdf->SetLineWidth(1.5);
+        $pdf->RoundedRect($qr_x - 3, $col_right_y - 3, $qr_size + 6, $qr_size + 6, 4, '1111', '');
+        
+        // QR
+        $pdf->Image($qr_path, $qr_x, $col_right_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // === CÓDIGO QR GRANDE Y DESTACADO ===
-        $qr_size = 80; // Tamaño optimizado para caber en una página
-        $qr_x = (210 - $qr_size) / 2;
-        $qr_y = $pdf->GetY();
+        // === PIE DE PÁGINA ELEGANTE ===
+        $pie_y = 275;
+        $pdf->SetY($pie_y);
         
-        // Fondo para QR con esquinas redondeadas - más grande
-        $pdf->SetFillColor(240, 245, 250);
-        $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', 'F');
+        $pdf->SetDrawColor(230, 230, 230);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line(0, $pie_y, 210, $pie_y);
         
-        // Borde decorativo alrededor del QR
-        $pdf->SetDrawColor(76, 175, 80);
-        $pdf->SetLineWidth(0.8);
-        $pdf->RoundedRect($qr_x - 6, $qr_y - 3, $qr_size + 12, $qr_size + 6, 5, '1111', '');
+        $pdf->SetTextColor(160, 160, 160);
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->Cell(0, 4, 'Escanea el código QR para registrar tu asistencia', 0, 1, 'C');
         
-        $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $pdf->SetFont('helvetica', 'I', 7);
+        $pdf->SetTextColor(180, 180, 180);
+        $pdf->Cell(0, 3, 'Documento de acceso - No transferible', 0, 1, 'C');
 
         // Salida del PDF
         $pdf_filename = 'entrada_' . preg_replace('/[^\p{L}\p{N}\-]+/u', '-', $nombre_completo) . '_' . time() . '.pdf';
