@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Diseño con cabecera redondeada (4 esquinas), tick de confirmación y QR con fondo limpio.
- * Version: 2.3.0
+ * Version: 2.1.0
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 8;
 
-        // === IMAGEN CABECERA (4 ESQUINAS REDONDEADAS) ===
+        // === IMAGEN CABECERA (CORREGIDO: 4 ESQUINAS REDONDEADAS) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -167,11 +167,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
                     
                     $pdf->StartTransform();
+                    // '1111' indica que las 4 esquinas se redondean. 'CNZ' aplica el recorte.
                     $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
                     $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                     $pdf->StopTransform();
 
-                    $y_dinamica = 8 + $alto_pdf + 5;
+                    $y_dinamica = 8 + $alto_pdf + 10;
                 }
             }
         }
@@ -181,62 +182,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetLineWidth(0.5);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'D');
 
+        $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === BLOQUE FECHA Y UBICACIÓN (LADO A LADO) ===
-        $fecha_timestamp = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
-        $mes_nombre = strtoupper(mb_substr(strftime('%B', $fecha_timestamp), 0, 3, 'UTF-8'));
-        $dia = date('d', $fecha_timestamp);
-        $ano = date('Y', $fecha_timestamp);
-
-        // Posición de la fecha (lado izquierdo)
-        $fecha_x = 15;
-        $fecha_y = $pdf->GetY();
-        $fecha_ancho = 45;
-        $fecha_alto = 35;
-
-        // Rectángulo gris para la fecha
-        $pdf->SetFillColor(50, 50, 55);
-        $pdf->RoundedRect($fecha_x, $fecha_y, $fecha_ancho, $fecha_alto, 3, '1111', 'F');
-
-        // Mes
-        $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 9);
-        $pdf->SetXY($fecha_x, $fecha_y + 2);
-        $pdf->Cell($fecha_ancho, 5, $mes_nombre, 0, 1, 'C');
-
-        // Día
-        $pdf->SetFont('helvetica', 'B', 24);
-        $pdf->SetXY($fecha_x, $fecha_y + 7);
-        $pdf->Cell($fecha_ancho, 16, $dia, 0, 1, 'C');
-
-        // Año
-        $pdf->SetFont('helvetica', '', 8);
-        $pdf->SetXY($fecha_x, $fecha_y + 23);
-        $pdf->Cell($fecha_ancho, 5, $ano, 0, 1, 'C');
-
-        // Ubicación (lado derecho, al lado de la fecha)
-        $ubicacion_x = $fecha_x + $fecha_ancho + 5;
-        $ubicacion_ancho = 195 - $ubicacion_x;
-        $ubicacion_y = $fecha_y;
-
-        $pdf->SetTextColor(60, 60, 65);
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY($ubicacion_x, $ubicacion_y + 3);
-        $pdf->Cell($ubicacion_ancho, 5, '📍 UBICACIÓN', 0, 1, 'L');
-
-        $pdf->SetTextColor(100, 100, 105);
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetXY($ubicacion_x, $ubicacion_y + 10);
-        $pdf->MultiCell($ubicacion_ancho, 5, $ubicacion, 0, 'L');
-
-        $pdf->SetAbsY($fecha_y + $fecha_alto + 5);
-        $pdf->SetMargins(25, 0, 25);
-
-        // === BADGE CONFIRMACIÓN CON TICK ===
-        $badge_w = 80;
+       // === BADGE CONFIRMACIÓN CON TICK (✓) ===
+        $badge_w = 80; // Reducido de 160 a 80
         $badge_h = 10;
-        $badge_x = (210 - $badge_w) / 2;
+        $badge_x = (210 - $badge_w) / 2; // Centrado automático basado en el nuevo ancho
         $badge_y = $pdf->GetY();
         
         $pdf->SetFillColor(76, 175, 80);
@@ -245,6 +197,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // Tick (✓)
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('zapfdingbats', '', 12);
+        // Ajustamos la X del tick para que esté pegado al texto en el centro
         $pdf->SetXY($badge_x + 5, $badge_y + 0.5); 
         $pdf->Cell(10, $badge_h, '4', 0, 0, 'L'); 
 
@@ -253,6 +206,24 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($badge_x, $badge_y);
         $pdf->Cell($badge_w, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'C'); 
         $pdf->Ln(15);
+
+        // === TÍTULO Y SEPARADOR ===
+        $pdf->SetTextColor(100, 100, 105);
+        $pdf->SetFont('helvetica', '', 12);
+        $pdf->MultiCell(0, 6, $titulo_a_mostrar, 0, 'C');
+        $pdf->Ln(2);
+
+        $pdf->SetDrawColor(200, 200, 210);
+        $pdf->SetLineWidth(0.4);
+        $pdf->Line(25, $pdf->GetY(), 185, $pdf->GetY());
+        $pdf->Ln(4);
+
+        // === FECHA Y LUGAR ===
+        $pdf->SetTextColor(120, 120, 125);
+        $pdf->SetFont('helvetica', '', 12); 
+        $info_evento = "FECHA: " . $fecha_evento . "   |   LUGAR: " . $ubicacion;
+        $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
+        $pdf->Ln(8);
 
         // === DATOS ASISTENTE ===
         $pdf->SetTextColor(60, 60, 65); 
@@ -265,12 +236,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
         $pdf->Ln(8);
 
-        // === QR CON DISEÑO REDONDEADO ===
+        // === QR CON DISEÑO REDONDEADO (CORREGIDO: FONDO BLANCO) ===
         $qr_size = 78;
         $qr_x = (215 - $qr_size) / 2;
         $qr_y = $pdf->GetY();
         
-        // Recuadro del QR con blanco puro
+        // Recuadro del QR: Ahora con blanco puro (255, 255, 255)
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($qr_x - 4, $qr_y - 4, $qr_size + 8, $qr_size + 8, 5, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
