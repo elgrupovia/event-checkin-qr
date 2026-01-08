@@ -1,12 +1,13 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339. Diseño con espaciado natural y confirmación al final.
- * Version: 2.8.0
+ * Description: Genera PDF con QR para el evento ID 50339. Diseño optimizado con elementos superiores elevados y confirmación fija abajo.
+ * Version: 2.9.1
  * */
 
 if (!defined('ABSPATH')) exit;
 
+// Carga de dependencias (TCPDF y Endroid QR)
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Endroid\QrCode\Builder\Builder;
@@ -45,11 +46,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
         $post_id = 50339;
 
+        // Recuperar datos del formulario
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
         $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // Datos del evento
         $titulo_evento = get_the_title($post_id);
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
@@ -61,7 +64,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $upload_dir = wp_upload_dir();
         
-        // Generar QR
+        // 1. Generar Código QR
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
             'nombre'  => rawurlencode($nombre_completo),
@@ -72,6 +75,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
+        // 2. Configuración del PDF
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
@@ -79,13 +83,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
-        // Fondo General
+        // Fondo Gris Claro General
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
 
         $y_cursor = 8;
 
-        // 1. FOTO DESTACADA
+        // --- BLOQUE FOTO DESTACADA ---
         $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
         if ($imagen_url) {
             $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
@@ -97,11 +101,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
                 $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                 $pdf->StopTransform();
-                $y_cursor = 8 + $alto_pdf + 12; // Espacio tras la imagen
+                $y_cursor = 8 + $alto_pdf + 8; // Espacio reducido tras la imagen
             }
         }
 
-        // 2. BLOQUE CALENDARIO Y DIRECCIÓN
+        // --- BLOQUE CALENDARIO Y UBICACIÓN ---
         $pdf->SetAbsY($y_cursor);
         $cal_x = 20; $cal_w = 38; $cal_h = 35;
         $pdf->SetFillColor(255, 255, 255);
@@ -128,10 +132,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', '', 11);
         $pdf->MultiCell(100, 5, $ubicacion, 0, 'L');
 
-        // Bajamos el cursor para el siguiente bloque con separación normal
-        $y_cursor += 45; 
-
-        // 3. DATOS ASISTENTE
+        // --- BLOQUE DATOS ASISTENTE (SUBIDO) ---
+        $y_cursor += 40; 
         $pdf->SetAbsY($y_cursor);
         $pdf->SetTextColor(60, 60, 65); 
         $pdf->SetFont('helvetica', 'B', 22);
@@ -141,10 +143,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(100, 100, 105);
         $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // Separación normal entre empresa y QR
-        $y_cursor += 25;
-
-        // 4. QR CENTRADO
+        // --- BLOQUE QR (SUBIDO) ---
+        $y_cursor += 15; // Espacio entre empresa y QR
         $pdf->SetAbsY($y_cursor);
         $qr_size = 65; 
         $qr_x = (210 - $qr_size) / 2;
@@ -152,36 +152,36 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_cursor, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // 5. ENTRADA CONFIRMADA (DEBAJO DEL TODO)
-        // Fijamos la posición al final del área imprimible (aprox 270mm)
+        // --- BLOQUE ENTRADA CONFIRMADA (FIJO AL FINAL) ---
         $y_final = 265; 
         $pdf->SetAbsY($y_final);
         $badge_w = 70;
         $badge_x = (210 - $badge_w) / 2;
-        $pdf->SetFillColor(76, 175, 80);
+        $pdf->SetFillColor(76, 175, 80); // Color verde confirmación
         $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(0, 9, '✓ ENTRADA CONFIRMADA', 0, 1, 'C');
 
-        // Finalizar
+        // --- FINALIZAR PDF ---
         $pdf_filename = 'entrada_' . preg_replace('/[^a-z0-9]+/', '-', strtolower($nombre_completo)) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
-        @unlink($qr_path);
+        @unlink($qr_path); // Limpiar QR temporal
 
+        // Guardar registro en Meta
         $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
         $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'fecha_hora' => current_time('mysql')];
         update_post_meta($post_id, '_asistentes', $asistentes);
 
     } catch (Exception $e) {
-        error_log("❌ Error PDF: " . $e->getMessage());
+        error_log("❌ Error PDF Event Check-In: " . $e->getMessage());
     }
 }
 
 /**
  * ---------------------------
- * Manejador de Check-in (ID Fijo: 50339)
+ * Manejador de Check-in (Página de Destino)
  * ---------------------------
  */
 add_action('template_redirect', function(){
@@ -196,6 +196,8 @@ add_action('template_redirect', function(){
             'tipo' => 'escaneo_qr'
         ];
         update_post_meta($post_id, '_asistentes', $asistentes);
+        
+        // Interfaz de confirmación visual en el móvil del controlador
         echo "<div style='text-align:center;font-family:sans-serif;margin-top:100px;'>";
         echo "<div style='font-size:80px;color:#4CAF50;'>✅</div>";
         echo "<h1 style='color:#333;'>Check-in confirmado</h1>";
@@ -207,22 +209,25 @@ add_action('template_redirect', function(){
 
 /**
  * ---------------------------
- * Administración de Asistentes
+ * Administración de Asistentes en WordPress
  * ---------------------------
  */
 add_action('admin_menu', function() {
-    add_submenu_page('edit.php?post_type=eventos', 'Asistentes', 'Asistentes', 'manage_options', 'eventos-asistentes', function() {
+    add_submenu_page('edit.php?post_type=eventos', 'Asistentes', 'Asistentes QR', 'manage_options', 'eventos-asistentes', function() {
         echo '<div class="wrap"><h1>🧾 Asistentes Registrados</h1>';
         $post_id = 50339;
         $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
-        echo "<h2>" . esc_html(get_the_title($post_id)) . " (ID: 50339)</h2>";
+        echo "<h2>Evento: " . esc_html(get_the_title($post_id)) . " (ID: 50339)</h2>";
         if (!empty($asistentes)) {
-            echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th><th>Fecha/Hora</th></tr></thead><tbody>';
-            foreach ($asistentes as $a) {
-                echo "<tr><td>".esc_html($a['nombre'])."</td><td>".esc_html($a['empresa'])."</td><td>".esc_html($a['fecha_hora'] ?? '-')."</td></tr>";
+            echo '<table class="widefat" style="margin-top:20px;"><thead><tr><th>Nombre</th><th>Empresa</th><th>Fecha/Hora</th><th>Origen</th></tr></thead><tbody>';
+            foreach (array_reverse($asistentes) as $a) {
+                $tipo = isset($a['tipo']) ? '📱 Escaneo' : '📧 Registro';
+                echo "<tr><td>".esc_html($a['nombre'])."</td><td>".esc_html($a['empresa'])."</td><td>".esc_html($a['fecha_hora'] ?? '-')."</td><td>".$tipo."</td></tr>";
             }
             echo '</tbody></table>';
-        } else { echo "<p>No hay asistentes registrados para este evento.</p>"; }
+        } else { 
+            echo "<p>No hay asistentes registrados aún para este evento.</p>"; 
+        }
         echo '</div>';
     });
 });
