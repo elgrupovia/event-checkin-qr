@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido: iconos como imágenes.
- * Version: 2.9.4
- * */
+ * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido y compacto.
+ * Version: 2.9.3
+ */
 
 if (!defined('ABSPATH')) exit;
 
@@ -19,268 +19,210 @@ use TCPDF;
  * ---------------------------
  */
 function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
-    $tmp = null; $imagen_path = '';
+    $tmp = null; 
+    $imagen_path = '';
     $attachment_id = attachment_url_to_postid($imagen_url);
+
     if($attachment_id){
         $imagen_meta = wp_get_attachment_metadata($attachment_id);
         if($imagen_meta && isset($imagen_meta['file'])){
             $imagen_path = $upload_dir['basedir'].'/'.$imagen_meta['file'];
         }
     }
+
     if(!file_exists($imagen_path) && function_exists('download_url')){
         $tmp = download_url($imagen_url, 300);
         if(!is_wp_error($tmp)) $imagen_path = $tmp;
     }
+
     return ['path'=>$imagen_path,'tmp'=>$tmp];
 }
 
 /**
- * Crear iconos simples como PNG
- */
-function crear_icono_ubicacion($upload_dir) {
-    $icono_path = $upload_dir['basedir'] . '/icono_ubicacion.png';
-    if (!file_exists($icono_path)) {
-        $img = imagecreate(20, 20);
-        $blanco = imagecolorallocate($img, 255, 255, 255);
-        $gris = imagecolorallocate($img, 80, 80, 80);
-        imagefill($img, 0, 0, $blanco);
-        
-        // Círculo punteador
-        imagefilledellipse($img, 10, 8, 4, 4, $gris);
-        // Triángulo inferior (simplificado como líneas)
-        imageline($img, 6, 10, 10, 16, $gris);
-        imageline($img, 14, 10, 10, 16, $gris);
-        imageline($img, 6, 10, 14, 10, $gris);
-        
-        imagepng($img, $icono_path);
-        imagedestroy($img);
-    }
-    return $icono_path;
-}
-
-function crear_icono_check($upload_dir) {
-    $icono_path = $upload_dir['basedir'] . '/icono_check.png';
-    if (!file_exists($icono_path)) {
-        $img = imagecreate(24, 24);
-        $blanco = imagecolorallocate($img, 255, 255, 255);
-        $verde = imagecolorallocate($img, 76, 175, 80);
-        imagefill($img, 0, 0, $blanco);
-        
-        // Círculo verde de fondo
-        imagefilledellipse($img, 12, 12, 22, 22, $verde);
-        
-        // Check blanco (líneas)
-        $blanco_color = imagecolorallocate($img, 255, 255, 255);
-        imageline($img, 7, 12, 10, 15, $blanco_color);
-        imageline($img, 10, 15, 17, 8, $blanco_color);
-        imageline($img, 10, 16, 17, 9, $blanco_color);
-        imageline($img, 8, 12, 11, 15, $blanco_color);
-        
-        imagepng($img, $icono_path);
-        imagedestroy($img);
-    }
-    return $icono_path;
-}
-
-/**
  * ---------------------------
- * Generar PDF con QR (ID Evento: 50339)
+ * Generar PDF con QR
  * ---------------------------
  */
-add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
+add_action(
+    'jet-form-builder/custom-action/inscripciones_qr',
+    'generar_qr_pdf_personalizado',
+    10,
+    3
+);
 
 function generar_qr_pdf_personalizado($request, $action_handler) {
+
     try {
         $post_id = 50339;
 
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
-        $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
-        $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $apellidos_persona = sanitize_text_field($request['apellidos'] ?? '');
+        $nombre_completo = html_entity_decode(
+            trim($nombre_persona.' '.$apellidos_persona),
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
 
         $titulo_evento = get_the_title($post_id);
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
+
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
-        
         $fecha_timestamp = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
+
         $dia = date('d', $fecha_timestamp);
         $mes_nombre = strtoupper(date_i18n('M', $fecha_timestamp));
         $ano = date('Y', $fecha_timestamp);
 
         $upload_dir = wp_upload_dir();
-        
-        // Crear iconos
-        $icono_ubicacion = crear_icono_ubicacion($upload_dir);
-        $icono_check = crear_icono_check($upload_dir);
-        
-        // Generar QR
+
+        /**
+         * -------- QR --------
+         */
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
             'nombre'  => rawurlencode($nombre_completo),
             'evento'  => rawurlencode($titulo_evento),
         ];
+
         $qr_url = home_url('/checkin/') . '?' . http_build_query($params);
-        $qr = Builder::create()->writer(new PngWriter())->data($qr_url)->size(300)->margin(10)->build();
+
+        $qr = Builder::create()
+            ->writer(new PngWriter())
+            ->data($qr_url)
+            ->size(300)
+            ->margin(10)
+            ->build();
+
         $qr_path = $upload_dir['basedir'] . '/temp_qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
+        /**
+         * -------- PDF --------
+         */
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
-        $pdf->SetAutoPageBreak(false, 0); 
-        $pdf->SetMargins(8, 8, 8); 
+        $pdf->SetAutoPageBreak(false, 0);
+        $pdf->SetMargins(8, 8, 8);
         $pdf->AddPage();
-        
-        // Fondo General
+
+        // Fondo
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
 
         $y_cursor = 8;
 
-        // 1. FOTO DESTACADA
+        /**
+         * -------- FOTO --------
+         */
         $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
         if ($imagen_url) {
             $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
             if (file_exists($imagen_info['path'])) {
-                list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
-                $ancho_pdf = 194; 
-                $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
+                list($w, $h) = getimagesize($imagen_info['path']);
+                $ancho_pdf = 194;
+                $alto_pdf = ($h * $ancho_pdf) / $w;
+
                 $pdf->StartTransform();
                 $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
-                $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf);
                 $pdf->StopTransform();
-                $y_cursor = 8 + $alto_pdf + 8; 
+
+                $y_cursor = 8 + $alto_pdf + 8;
             }
         }
 
-        // 2. BLOQUE CALENDARIO Y DIRECCIÓN
+        /**
+         * -------- CALENDARIO + UBICACIÓN --------
+         */
         $pdf->SetAbsY($y_cursor);
-        $cal_x = 20; $cal_w = 38; $cal_h = 35;
-        
-        // Caja Calendario
-        $pdf->SetFillColor(255, 255, 255);
+
+        $cal_x = 20;
+        $cal_w = 38;
+        $cal_h = 35;
+
+        $pdf->SetFillColor(255,255,255);
         $pdf->RoundedRect($cal_x, $y_cursor, $cal_w, $cal_h, 3, '1111', 'F');
-        $pdf->SetFillColor(30, 30, 30); 
+
+        $pdf->SetFillColor(30,30,30);
         $pdf->RoundedRect($cal_x, $y_cursor, $cal_w, 8, 3, '1100', 'F');
-        
-        $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 10);
+
+        $pdf->SetTextColor(255,255,255);
+        $pdf->SetFont('helvetica','B',10);
         $pdf->SetXY($cal_x, $y_cursor + 1.5);
-        $pdf->Cell($cal_w, 5, $mes_nombre, 0, 0, 'C');
-        
-        $pdf->SetTextColor(30, 30, 30); 
-        $pdf->SetFont('helvetica', 'B', 22);
+        $pdf->Cell($cal_w,5,$mes_nombre,0,0,'C');
+
+        $pdf->SetTextColor(30,30,30);
+        $pdf->SetFont('helvetica','B',22);
         $pdf->SetXY($cal_x, $y_cursor + 10);
-        $pdf->Cell($cal_w, 15, $dia, 0, 0, 'C');
-        
-        $pdf->SetFont('helvetica', '', 9);
+        $pdf->Cell($cal_w,15,$dia,0,0,'C');
+
+        $pdf->SetFont('helvetica','',9);
         $pdf->SetXY($cal_x, $y_cursor + 26);
-        $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
+        $pdf->Cell($cal_w,5,$ano,0,0,'C');
 
-        // Texto Ubicación con icono
-        $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 4);
-        $pdf->Image($icono_ubicacion, $cal_x + $cal_w + 8, $y_cursor + 3, 4, 4, 'PNG', '', '', false, 300);
-        $pdf->SetXY($cal_x + $cal_w + 14, $y_cursor + 4);
-        $pdf->Cell(0, 4, 'UBICACION', 0, 1, 'L');
-        
-        $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 10);
-        $pdf->MultiCell(100, 4, $ubicacion, 0, 'L');
+        // Ubicación
+        $pdf->SetFont('dejavusans','B',11);
+        $pdf->SetTextColor(80,80,80);
+        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 5);
+        $pdf->Cell(0,5,'📍 UBICACIÓN',0,1);
 
-        // 3. DATOS ASISTENTE - POSICIÓN ACTUALIZADA (Mayor altura)
-        $y_cursor = $y_cursor + 48; 
+        $pdf->SetFont('helvetica','',11);
+        $pdf->SetX($cal_x + $cal_w + 10);
+        $pdf->MultiCell(100,5,$ubicacion);
+
+        // ⭐ CAMBIO CLAVE
+        $y_after_location = $pdf->GetY();
+
+        /**
+         * -------- ASISTENTE --------
+         */
+        $y_cursor = $y_after_location + 6; // ⭐ MÁS CERCA
         $pdf->SetAbsY($y_cursor);
-        
-        $pdf->SetTextColor(60, 60, 65); 
-        $pdf->SetFont('helvetica', 'B', 22);
-        $pdf->Cell(0, 12, $nombre_completo, 0, 1, 'C');
-        
-        $pdf->SetFont('helvetica', 'B', 13);
-        $pdf->SetTextColor(100, 100, 105);
-        $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // 4. QR CENTRADO
-        $y_cursor = $pdf->GetY() + 15; // Mayor separación
-        $qr_size = 65; 
+        $pdf->SetFont('helvetica','B',22);
+        $pdf->SetTextColor(60,60,65);
+        $pdf->Cell(0,12,$nombre_completo,0,1,'C');
+
+        $pdf->SetFont('helvetica','B',13);
+        $pdf->SetTextColor(100,100,105);
+        $pdf->Cell(0,8,mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
+
+        /**
+         * -------- QR --------
+         */
+        $y_cursor = $pdf->GetY() + 4; // ⭐ QR MÁS ARRIBA
+        $qr_size = 65;
         $qr_x = (210 - $qr_size) / 2;
-        
-        $pdf->SetFillColor(255, 255, 255);
+
+        $pdf->SetFillColor(255,255,255);
         $pdf->RoundedRect($qr_x - 4, $y_cursor, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
-        $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size);
 
-        // 5. ENTRADA CONFIRMADA - POSICIÓN FIJA ABAJO con icono
-        $y_final = 265; 
-        $pdf->SetAbsY($y_final);
-        $badge_w = 75;
+        /**
+         * -------- CONFIRMADO --------
+         */
+        $y_final = 265;
+        $badge_w = 70;
         $badge_x = (210 - $badge_w) / 2;
-        $pdf->SetFillColor(76, 175, 80);
-        $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
-        
-        // Icono check
-        $pdf->Image($icono_check, $badge_x + 3, $y_final + 1.5, 6, 6, 'PNG', '', '', false, 300);
-        
-        // Texto
-        $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($badge_x + 10, $y_final + 0.5);
-        $pdf->Cell($badge_w - 10, 8, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
-        // Finalizar
-        $pdf_filename = 'entrada_' . preg_replace('/[^a-z0-9]+/', '-', strtolower($nombre_completo)) . '_' . time() . '.pdf';
-        $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
-        $pdf->Output($pdf_path, 'F');
+        $pdf->SetAbsY($y_final);
+        $pdf->SetFillColor(76,175,80);
+        $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
+
+        $pdf->SetFont('dejavusans','B',10);
+        $pdf->SetTextColor(255,255,255);
+        $pdf->Cell(0,9,'✓ ENTRADA CONFIRMADA',0,1,'C');
+
+        /**
+         * -------- GUARDAR --------
+         */
+        $pdf_filename = 'entrada_' . time() . '.pdf';
+        $pdf->Output($upload_dir['basedir'].'/'.$pdf_filename, 'F');
         @unlink($qr_path);
 
-        $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
-        $asistentes[] = ['nombre' => $nombre_completo, 'empresa' => $nombre_empresa, 'fecha_hora' => current_time('mysql')];
-        update_post_meta($post_id, '_asistentes', $asistentes);
-
     } catch (Exception $e) {
-        error_log("Error PDF: " . $e->getMessage());
+        error_log('❌ PDF ERROR: '.$e->getMessage());
     }
 }
-
-/**
- * ---------------------------
- * Manejador de Check-in y Admin
- * ---------------------------
- */
-add_action('template_redirect', function(){
-    if(strpos($_SERVER['REQUEST_URI'],'/checkin/')!==false){
-        $post_id = 50339;
-        $nombre = sanitize_text_field($_GET['nombre'] ?? 'Invitado');
-        $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
-        $asistentes[] = [
-            'nombre' => $nombre,
-            'empresa' => sanitize_text_field($_GET['empresa'] ?? ''),
-            'fecha_hora' => current_time('mysql'),
-            'tipo' => 'escaneo_qr'
-        ];
-        update_post_meta($post_id, '_asistentes', $asistentes);
-        echo "<div style='text-align:center;font-family:sans-serif;margin-top:100px;'>";
-        echo "<div style='font-size:80px;color:#4CAF50;'>OK</div>";
-        echo "<h1 style='color:#333;'>Check-in confirmado</h1>";
-        echo "<p style='font-size:20px;'>Bienvenido/a: <br><strong style='font-size:30px;'>" . esc_html($nombre) . "</strong></p>";
-        echo "</div>";
-        exit;
-    }
-});
-
-add_action('admin_menu', function() {
-    add_submenu_page('edit.php?post_type=eventos', 'Asistentes', 'Asistentes QR', 'manage_options', 'eventos-asistentes', function() {
-        echo '<div class="wrap"><h1>Asistentes Registrados</h1>';
-        $post_id = 50339;
-        $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
-        echo "<h2>" . esc_html(get_the_title($post_id)) . " (ID: 50339)</h2>";
-        if (!empty($asistentes)) {
-            echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th><th>Fecha/Hora</th></tr></thead><tbody>';
-            foreach (array_reverse($asistentes) as $a) {
-                echo "<tr><td>".esc_html($a['nombre'])."</td><td>".esc_html($a['empresa'])."</td><td>".esc_html($a['fecha_hora'] ?? '-')."</td></tr>";
-            }
-            echo '</tbody></table>';
-        } else { echo "<p>No hay asistentes registrados.</p>"; }
-        echo '</div>';
-    });
-});
