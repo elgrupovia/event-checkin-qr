@@ -65,7 +65,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // Datos evento
         $titulo_evento = get_the_title($post_id);
-        $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
+        $ubicacion = html_entity_decode(
+            get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible',
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
 
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
         $ts = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
