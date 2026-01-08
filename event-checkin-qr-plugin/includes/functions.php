@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339. Diseño compacto: Nombre y QR subidos cerca de la ubicación.
- * Version: 2.7.0
+ * Description: Genera PDF con QR para el evento ID 50339. Diseño con espaciado natural y confirmación al final.
+ * Version: 2.8.0
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -79,6 +79,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
+        // Fondo General
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
 
@@ -96,7 +97,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
                 $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                 $pdf->StopTransform();
-                $y_cursor = 8 + $alto_pdf + 8;
+                $y_cursor = 8 + $alto_pdf + 12; // Espacio tras la imagen
             }
         }
 
@@ -127,23 +128,23 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont('helvetica', '', 11);
         $pdf->MultiCell(100, 5, $ubicacion, 0, 'L');
 
-        // --- SUBIDA DE ELEMENTOS ---
-        // Reducimos el espacio después de la ubicación (antes era +45, ahora +38)
-        $y_cursor += 38; 
+        // Bajamos el cursor para el siguiente bloque con separación normal
+        $y_cursor += 45; 
 
-        // 3. DATOS ASISTENTE (Pegados a la ubicación)
+        // 3. DATOS ASISTENTE
         $pdf->SetAbsY($y_cursor);
         $pdf->SetTextColor(60, 60, 65); 
         $pdf->SetFont('helvetica', 'B', 22);
         $pdf->Cell(0, 10, $nombre_completo, 0, 1, 'C');
+        
         $pdf->SetFont('helvetica', 'B', 13);
         $pdf->SetTextColor(100, 100, 105);
-        $pdf->Cell(0, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
+        $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // Espacio entre nombre y QR reducido (antes +22, ahora +10)
-        $y_cursor += 16;
+        // Separación normal entre empresa y QR
+        $y_cursor += 25;
 
-        // 4. QR CENTRADO (Más arriba)
+        // 4. QR CENTRADO
         $pdf->SetAbsY($y_cursor);
         $qr_size = 65; 
         $qr_x = (210 - $qr_size) / 2;
@@ -151,15 +152,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_cursor, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // Bajamos el cursor para que el mensaje de confirmación se quede donde estaba antes
-        $y_cursor = 245; 
-
-        // 5. ENTRADA CONFIRMADA (Posición original)
-        $pdf->SetAbsY($y_cursor);
+        // 5. ENTRADA CONFIRMADA (DEBAJO DEL TODO)
+        // Fijamos la posición al final del área imprimible (aprox 270mm)
+        $y_final = 265; 
+        $pdf->SetAbsY($y_final);
         $badge_w = 70;
         $badge_x = (210 - $badge_w) / 2;
         $pdf->SetFillColor(76, 175, 80);
-        $pdf->RoundedRect($badge_x, $y_cursor, $badge_w, 9, 3, '1111', 'F');
+        $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->Cell(0, 9, '✓ ENTRADA CONFIRMADA', 0, 1, 'C');
