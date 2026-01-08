@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Diseño con cabecera redondeada (4 esquinas), tick de confirmación, calendario y QR con fondo limpio.
- * Version: 2.2.0
+ * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Diseño con cabecera redondeada (4 esquinas), tick de confirmación y QR con fondo limpio.
+ * Version: 2.3.0
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -107,43 +107,6 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 }
 
 /**
- * Generar widget de calendario en TCPDF
- */
-function generar_calendario_pdf($pdf, $fecha_raw, $x, $y) {
-    if (!$fecha_raw) return;
-    
-    $fecha = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
-    if (!$fecha) return;
-    
-    $mes = strtoupper(mb_substr(strftime('%B', $fecha), 0, 3, 'UTF-8'));
-    $dia = date('d', $fecha);
-    $ano = date('Y', $fecha);
-    
-    $ancho = 50;
-    $alto = 55;
-    
-    // Fondo gris oscuro
-    $pdf->SetFillColor(50, 50, 55);
-    $pdf->RoundedRect($x, $y, $ancho, $alto, 3, '1111', 'F');
-    
-    // Mes (arriba)
-    $pdf->SetTextColor(255, 255, 255);
-    $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->SetXY($x, $y + 3);
-    $pdf->Cell($ancho, 6, $mes, 0, 1, 'C');
-    
-    // Día (grande en el centro)
-    $pdf->SetFont('helvetica', 'B', 32);
-    $pdf->SetXY($x, $y + 10);
-    $pdf->Cell($ancho, 18, $dia, 0, 1, 'C');
-    
-    // Año (abajo)
-    $pdf->SetFont('helvetica', '', 9);
-    $pdf->SetXY($x, $y + 37);
-    $pdf->Cell($ancho, 6, $ano, 0, 1, 'C');
-}
-
-/**
  * ---------------------------
  * Generar PDF con QR
  * ---------------------------
@@ -218,14 +181,59 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetLineWidth(0.5);
         $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'D');
 
-        $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-        // === CALENDARIO WIDGET ===
-        generar_calendario_pdf($pdf, $fecha_raw, 82, $pdf->GetY());
-        $pdf->Ln(60);
+        // === BLOQUE FECHA Y UBICACIÓN (LADO A LADO) ===
+        $fecha_timestamp = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
+        $mes_nombre = strtoupper(mb_substr(strftime('%B', $fecha_timestamp), 0, 3, 'UTF-8'));
+        $dia = date('d', $fecha_timestamp);
+        $ano = date('Y', $fecha_timestamp);
 
-        // === BADGE CONFIRMACIÓN CON TICK (✓) ===
+        // Posición de la fecha (lado izquierdo)
+        $fecha_x = 15;
+        $fecha_y = $pdf->GetY();
+        $fecha_ancho = 45;
+        $fecha_alto = 35;
+
+        // Rectángulo gris para la fecha
+        $pdf->SetFillColor(50, 50, 55);
+        $pdf->RoundedRect($fecha_x, $fecha_y, $fecha_ancho, $fecha_alto, 3, '1111', 'F');
+
+        // Mes
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetXY($fecha_x, $fecha_y + 2);
+        $pdf->Cell($fecha_ancho, 5, $mes_nombre, 0, 1, 'C');
+
+        // Día
+        $pdf->SetFont('helvetica', 'B', 24);
+        $pdf->SetXY($fecha_x, $fecha_y + 7);
+        $pdf->Cell($fecha_ancho, 16, $dia, 0, 1, 'C');
+
+        // Año
+        $pdf->SetFont('helvetica', '', 8);
+        $pdf->SetXY($fecha_x, $fecha_y + 23);
+        $pdf->Cell($fecha_ancho, 5, $ano, 0, 1, 'C');
+
+        // Ubicación (lado derecho, al lado de la fecha)
+        $ubicacion_x = $fecha_x + $fecha_ancho + 5;
+        $ubicacion_ancho = 195 - $ubicacion_x;
+        $ubicacion_y = $fecha_y;
+
+        $pdf->SetTextColor(60, 60, 65);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetXY($ubicacion_x, $ubicacion_y + 3);
+        $pdf->Cell($ubicacion_ancho, 5, '📍 UBICACIÓN', 0, 1, 'L');
+
+        $pdf->SetTextColor(100, 100, 105);
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetXY($ubicacion_x, $ubicacion_y + 10);
+        $pdf->MultiCell($ubicacion_ancho, 5, $ubicacion, 0, 'L');
+
+        $pdf->SetAbsY($fecha_y + $fecha_alto + 5);
+        $pdf->SetMargins(25, 0, 25);
+
+        // === BADGE CONFIRMACIÓN CON TICK ===
         $badge_w = 80;
         $badge_h = 10;
         $badge_x = (210 - $badge_w) / 2;
@@ -245,12 +253,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($badge_x, $badge_y);
         $pdf->Cell($badge_w, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'C'); 
         $pdf->Ln(15);
-
-        // === LUGAR (sin repetir evento) ===
-        $pdf->SetTextColor(120, 120, 125);
-        $pdf->SetFont('helvetica', '', 11); 
-        $pdf->MultiCell(0, 6, "📍 " . $ubicacion, 0, 'C');
-        $pdf->Ln(4);
 
         // === DATOS ASISTENTE ===
         $pdf->SetTextColor(60, 60, 65); 
