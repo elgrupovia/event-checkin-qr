@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR, nombre del asistente y confirmación en la parte superior. Sincroniza con asistentes.
- * Version: 2.5.0
+ * Description: Genera PDF con QR para el evento ID 50339. Nombre del asistente y confirmación en la parte superior.
+ * Version: 2.6.0
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -18,78 +18,6 @@ use TCPDF;
  * Funciones de Utilidad
  * ---------------------------
  */
-function normalizar_texto($texto) {
-    $texto = mb_strtolower($texto, 'UTF-8');
-    $texto = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
-    $texto = preg_replace('/\s+/', ' ', trim($texto));
-    $texto = preg_replace('/[^a-z0-9\s\-]/', '', $texto);
-    return $texto;
-}
-
-function primeras_palabras($texto, $limite = 3) {
-    $texto = trim(preg_replace('/\s+/', ' ', $texto));
-    $palabras = explode(' ', $texto);
-    return implode(' ', array_slice($palabras, 0, $limite));
-}
-
-function buscar_evento_robusto($titulo_buscado) {
-    $primeras = primeras_palabras($titulo_buscado, 3);
-    $ciudades = ['barcelona','valencia','madrid','bilbao'];
-    $ciudad_form = null;
-    $normForm = normalizar_texto($titulo_buscado);
-
-    foreach($ciudades as $c){
-        if(stripos($normForm, normalizar_texto($c)) !== false){
-            $ciudad_form = $c; break;
-        }
-    }
-
-    $args = [
-        'post_type' => 'eventos',
-        'post_status' => 'publish',
-        'posts_per_page' => -1,
-        'orderby' => 'date',
-        'order' => 'DESC',
-        's' => $primeras,
-        'tax_query' => [
-            'relation' => 'AND',
-            [
-                'taxonomy' => 'ano',
-                'field' => 'slug',
-                'terms' => ['2025'],
-            ],
-            [
-                'taxonomy' => 'ciudades',
-                'field' => 'slug',
-                'terms' => $ciudades,
-            ],
-        ],
-    ];
-
-    $eventos = get_posts($args);
-    $event_id = 0;
-
-    if(!empty($eventos) && $ciudad_form){
-        $ciudad_buscar = normalizar_texto($ciudad_form);
-        foreach($eventos as $evento){
-            $titulo_evento_norm = normalizar_texto(get_the_title($evento->ID));
-            if(stripos($titulo_evento_norm,$ciudad_buscar)!==false){
-                $event_id = $evento->ID; break;
-            }
-        }
-    }
-
-    if($event_id===0){
-        $eventos_all = get_posts(['post_type'=>'eventos','post_status'=>'publish','posts_per_page'=>-1]);
-        foreach($eventos_all as $evento){
-            if(stripos(normalizar_texto(get_the_title($evento->ID)), normalizar_texto($titulo_buscado))!==false){
-                $event_id = $evento->ID; break;
-            }
-        }
-    }
-    return $event_id;
-}
-
 function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
     $tmp = null; $imagen_path = '';
     $attachment_id = attachment_url_to_postid($imagen_url);
@@ -108,22 +36,23 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 
 /**
  * ---------------------------
- * Generar PDF con QR (Layout Optimizado)
+ * Generar PDF con QR (ID Evento Forzado: 50339)
  * ---------------------------
  */
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
+        // ID DEL EVENTO FIJO
+        $post_id = 50339;
+
         // Datos del Asistente
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre_persona = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos_persona = sanitize_text_field($request['apellidos'] ?? $request['last_name'] ?? '');
         $nombre_completo = html_entity_decode(trim($nombre_persona . ' ' . $apellidos_persona), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Buscar Evento
-        $titulo_evento_formulario = sanitize_text_field($request['eventos_2025'][0] ?? '');
-        $post_id = $titulo_evento_formulario ? buscar_evento_robusto($titulo_evento_formulario) : null;
-        
+        // Datos del Evento desde el ID 50339
+        $titulo_evento = get_the_title($post_id);
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Dirección no disponible';
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
         
@@ -139,7 +68,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $params = [
             'empresa' => rawurlencode($nombre_empresa),
             'nombre'  => rawurlencode($nombre_completo),
-            'evento'  => rawurlencode($post_id ? get_the_title($post_id) : $titulo_evento_formulario),
+            'evento'  => rawurlencode($titulo_evento),
         ];
         $qr_url = $base_url . '?' . http_build_query($params);
         $qr = Builder::create()->writer(new PngWriter())->data($qr_url)->size(300)->margin(10)->build();
@@ -154,28 +83,26 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(10, 10, 10); 
         $pdf->AddPage();
         
-        // Fondo General del ticket
+        // Fondo General
         $pdf->SetFillColor(245, 245, 247);
         $pdf->RoundedRect(10, 10, 190, 277, 6, '1111', 'F');
 
         $y_cursor = 10;
 
-        // 1. IMAGEN CABECERA
-        if ($post_id) {
-            $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
-            if ($imagen_url) {
-                $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
-                if (file_exists($imagen_info['path'])) {
-                    list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
-                    $ancho_pdf = 190; 
-                    $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
-                    $pdf->Image($imagen_info['path'], 10, 10, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
-                    $y_cursor = 10 + $alto_pdf + 8;
-                }
+        // 1. IMAGEN CABECERA (del evento 50339)
+        $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
+        if ($imagen_url) {
+            $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
+            if (file_exists($imagen_info['path'])) {
+                list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
+                $ancho_pdf = 190; 
+                $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
+                $pdf->Image($imagen_info['path'], 10, 10, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                $y_cursor = 10 + $alto_pdf + 8;
             }
         }
 
-        // 2. BARRA DE CONFIRMACIÓN (SUBIDA)
+        // 2. BARRA DE CONFIRMACIÓN
         $pdf->SetFillColor(76, 175, 80);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 12);
@@ -184,7 +111,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         
         $y_cursor += 15;
 
-        // 3. DATOS DEL ASISTENTE (SUBIDOS)
+        // 3. DATOS DEL ASISTENTE
         $pdf->SetTextColor(30, 30, 30);
         $pdf->SetFont('helvetica', 'B', 24);
         $pdf->SetXY(10, $y_cursor);
@@ -197,7 +124,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_cursor += 12;
 
-        // 4. QR CENTRADO (SUBIDO)
+        // 4. QR CENTRADO
         $qr_size = 70;
         $qr_x = (210 - $qr_size) / 2;
         $pdf->SetFillColor(255, 255, 255);
@@ -211,7 +138,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $y_cursor, $cal_w, $cal_h, 3, '1111', 'F');
         
-        // Franja Mes
         $pdf->SetFillColor(30, 30, 30); 
         $pdf->RoundedRect($cal_x, $y_cursor, $cal_w, 8, 3, '1100', 'F');
         $pdf->SetTextColor(255, 255, 255);
@@ -219,13 +145,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $y_cursor + 1.5);
         $pdf->Cell($cal_w, 5, $mes_nombre, 0, 0, 'C');
         
-        // Día
         $pdf->SetTextColor(30, 30, 30); 
         $pdf->SetFont('helvetica', 'B', 20);
         $pdf->SetXY($cal_x, $y_cursor + 10);
         $pdf->Cell($cal_w, 15, $dia, 0, 0, 'C');
 
-        // Dirección al lado
         $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 5);
         $pdf->SetTextColor(50, 50, 50);
         $pdf->SetFont('helvetica', 'B', 12);
@@ -238,16 +162,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         
         @unlink($qr_path);
         
-        // Registro de Asistente en WP
-        if ($post_id) {
-            $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
-            $asistentes[] = [
-                'nombre' => $nombre_completo, 
-                'empresa' => $nombre_empresa, 
-                'fecha_hora' => current_time('mysql')
-            ];
-            update_post_meta($post_id, '_asistentes', $asistentes);
-        }
+        // Registro de Asistente en WP (Meta del post 50339)
+        $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
+        $asistentes[] = [
+            'nombre' => $nombre_completo, 
+            'empresa' => $nombre_empresa, 
+            'fecha_hora' => current_time('mysql')
+        ];
+        update_post_meta($post_id, '_asistentes', $asistentes);
 
     } catch (Exception $e) {
         error_log("❌ Error PDF/Registro: " . $e->getMessage());
@@ -256,24 +178,23 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
 /**
  * ---------------------------
- * Manejador de Check-in
+ * Manejador de Check-in (ID Fijo: 50339)
  * ---------------------------
  */
 add_action('template_redirect', function(){
     if(strpos($_SERVER['REQUEST_URI'],'/checkin/')!==false){
+        $post_id = 50339;
         $nombre = sanitize_text_field($_GET['nombre'] ?? 'Invitado');
-        $evento = sanitize_text_field($_GET['evento'] ?? '');
-        $post_id = buscar_evento_robusto($evento);
-        if($post_id){
-            $asistentes = get_post_meta($post_id,'_asistentes',true) ?: [];
-            $asistentes[] = [
-                'nombre' => $nombre,
-                'empresa' => sanitize_text_field($_GET['empresa'] ?? ''),
-                'fecha_hora' => current_time('mysql'),
-                'tipo' => 'escaneo_qr'
-            ];
-            update_post_meta($post_id,'_asistentes',$asistentes);
-        }
+        
+        $asistentes = get_post_meta($post_id,'_asistentes',true) ?: [];
+        $asistentes[] = [
+            'nombre' => $nombre,
+            'empresa' => sanitize_text_field($_GET['empresa'] ?? ''),
+            'fecha_hora' => current_time('mysql'),
+            'tipo' => 'escaneo_qr'
+        ];
+        update_post_meta($post_id,'_asistentes',$asistentes);
+        
         echo "<div style='text-align:center;font-family:sans-serif;margin-top:100px;'>";
         echo "<div style='font-size:80px;color:#4CAF50;'>✅</div>";
         echo "<h1 style='color:#333;'>Check-in confirmado</h1>";
@@ -291,23 +212,22 @@ add_action('template_redirect', function(){
 add_action('admin_menu', function() {
     add_submenu_page('edit.php?post_type=eventos', 'Asistentes', 'Asistentes', 'manage_options', 'eventos-asistentes', function() {
         echo '<div class="wrap"><h1>🧾 Asistentes Registrados</h1>';
-        $eventos = get_posts(['post_type' => 'eventos', 'post_status' => 'publish', 'posts_per_page' => -1]);
-        foreach ($eventos as $e) {
-            $asistentes = get_post_meta($e->ID, '_asistentes', true) ?: [];
-            echo "<h2>" . esc_html($e->post_title) . "</h2>";
-            if (!empty($asistentes)) {
-                echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th><th>Fecha/Hora</th></tr></thead><tbody>';
-                foreach ($asistentes as $a) {
-                    echo "<tr>
-                            <td>".esc_html($a['nombre'])."</td>
-                            <td>".esc_html($a['empresa'])."</td>
-                            <td>".esc_html($a['fecha_hora'] ?? '-')."</td>
-                          </tr>";
-                }
-                echo '</tbody></table>';
-            } else {
-                echo "<p>No hay asistentes registrados para este evento.</p>";
+        $post_id = 50339;
+        $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
+        
+        echo "<h2>" . esc_html(get_the_title($post_id)) . " (ID: 50339)</h2>";
+        if (!empty($asistentes)) {
+            echo '<table class="widefat"><thead><tr><th>Nombre</th><th>Empresa</th><th>Fecha/Hora</th></tr></thead><tbody>';
+            foreach ($asistentes as $a) {
+                echo "<tr>
+                        <td>".esc_html($a['nombre'])."</td>
+                        <td>".esc_html($a['empresa'])."</td>
+                        <td>".esc_html($a['fecha_hora'] ?? '-')."</td>
+                      </tr>";
             }
+            echo '</tbody></table>';
+        } else {
+            echo "<p>No hay asistentes registrados para este evento.</p>";
         }
         echo '</div>';
     });
