@@ -137,41 +137,42 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * ---------- CALENDARIO (ESTILO REFERENCIA) ----------
+         * ---------- CALENDARIO (ESTILO REFERENCIA - CARTEL) ----------
          */
-        $cal_x = 14;
-        $cal_y = 14;
-        $cal_w = 56;
-        $cal_h = 52;
+        $cal_x = 12;
+        $cal_y = 12;
+        $cal_w = 60;
+        $cal_h = 58;
 
-        // Fondo oscuro con sombra
-        $pdf->SetFillColor(40,40,45);
-        $pdf->RoundedRect($cal_x-0.5,$cal_y-0.5,$cal_w+1,$cal_h+1,5,'1111','F');
+        // Fondo NEGRO del calendario
+        $pdf->SetFillColor(0,0,0);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,3,'1111','F');
 
-        // Fondo principal oscuro
-        $pdf->SetFillColor(50,50,55);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,5,'1111','F');
+        // BORDE GRIS CLARO alrededor
+        $pdf->SetDrawColor(180,180,180);
+        $pdf->SetLineWidth(0.8);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,3,'1111');
 
-        // Barra superior MES (más oscura)
-        $pdf->SetFillColor(30,30,35);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,10,5,'1100','F');
+        // Barra superior MES (fondo gris oscuro)
+        $pdf->SetFillColor(50,50,50);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,9,3,'1100','F');
 
-        // MES
-        $pdf->SetTextColor(200,200,205);
-        $pdf->SetFont('helvetica','B',9);
+        // MES (pequeño, gris claro)
+        $pdf->SetTextColor(200,200,200);
+        $pdf->SetFont('helvetica','B',8);
         $pdf->SetXY($cal_x,$cal_y+2);
-        $pdf->Cell($cal_w,6,$mes,0,0,'C');
+        $pdf->Cell($cal_w,5,$mes,0,0,'C');
 
-        // DÍA - GRANDE y BLANCO
+        // DÍA - ENORME y BLANCO
         $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','B',52);
-        $pdf->SetXY($cal_x,$cal_y+12);
-        $pdf->Cell($cal_w,28,$dia,0,0,'C');
+        $pdf->SetFont('helvetica','B',56);
+        $pdf->SetXY($cal_x,$cal_y+14);
+        $pdf->Cell($cal_w,26,$dia,0,0,'C');
 
-        // AÑO
-        $pdf->SetTextColor(180,180,185);
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->SetXY($cal_x,$cal_y+40);
+        // AÑO (gris claro)
+        $pdf->SetTextColor(200,200,200);
+        $pdf->SetFont('helvetica','B',9);
+        $pdf->SetXY($cal_x,$cal_y+42);
         $pdf->Cell($cal_w,8,$ano,0,0,'C');
 
         /**
