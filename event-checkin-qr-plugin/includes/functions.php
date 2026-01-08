@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Diseño con cabecera redondeada (4 esquinas), tick de confirmación y QR con fondo limpio.
- * Version: 2.1.0
+ * Description: Genera PDF con QR, registra asistentes y sincroniza con Zoho CRM. Diseño con cabecera redondeada, tick de confirmación y QR estilizado.
+ * Version: 2.0.0
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_dinamica = 8;
 
-        // === IMAGEN CABECERA (CORREGIDO: 4 ESQUINAS REDONDEADAS) ===
+        // === IMAGEN CABECERA (CORRECCIÓN ESQUINAS REDONDEADAS) ===
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
@@ -167,8 +167,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                     $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
                     
                     $pdf->StartTransform();
-                    // '1111' indica que las 4 esquinas se redondean. 'CNZ' aplica el recorte.
-                    $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
+                    // '1100' indica esquinas superior-izquierda y superior-derecha redondeadas
+                    $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1100', 'CNZ');
                     $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                     $pdf->StopTransform();
 
@@ -185,26 +185,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetMargins(25, 0, 25);
         $pdf->SetAbsY($y_dinamica);
 
-       // === BADGE CONFIRMACIÓN CON TICK (✓) ===
-        $badge_w = 80; // Reducido de 160 a 80
-        $badge_h = 10;
-        $badge_x = (210 - $badge_w) / 2; // Centrado automático basado en el nuevo ancho
+        // === BADGE CONFIRMACIÓN CON TICK (✓) ===
+        $badge_w = 160; $badge_h = 11;
+        $badge_x = (210 - $badge_w) / 2;
         $badge_y = $pdf->GetY();
-        
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $badge_y, $badge_w, $badge_h, 3, '1111', 'F');
         
-        // Tick (✓)
+        // Dibujamos el tick ✓ usando la fuente ZapfDingbats
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('zapfdingbats', '', 12);
-        // Ajustamos la X del tick para que esté pegado al texto en el centro
-        $pdf->SetXY($badge_x + 5, $badge_y + 0.5); 
-        $pdf->Cell(10, $badge_h, '4', 0, 0, 'L'); 
+        $pdf->SetXY($badge_x + 45, $badge_y + 1); // Posición manual para centrar con el texto
+        $pdf->Cell(10, $badge_h, '4', 0, 0, 'R'); // '4' es el código del tick en ZapfDingbats
 
-        // Texto "ENTRADA CONFIRMADA"
-        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetXY($badge_x, $badge_y);
-        $pdf->Cell($badge_w, $badge_h, 'ENTRADA CONFIRMADA', 0, 0, 'C'); 
+        $pdf->Cell($badge_w, $badge_h, '    ENTRADA CONFIRMADA', 0, 0, 'C'); 
         $pdf->Ln(15);
 
         // === TÍTULO Y SEPARADOR ===
@@ -225,7 +221,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->MultiCell(0, 6, $info_evento, 0, 'C');
         $pdf->Ln(8);
 
-        // === DATOS ASISTENTE ===
+        // === DATOS ASISTENTE (CARGO ELIMINADO) ===
         $pdf->SetTextColor(60, 60, 65); 
         $pdf->SetFont('helvetica', 'B', 20);
         $pdf->MultiCell(0, 10, $nombre_completo, 0, 'C');
@@ -236,13 +232,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0, 6, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
         $pdf->Ln(8);
 
-        // === QR CON DISEÑO REDONDEADO (CORREGIDO: FONDO BLANCO) ===
+        // === QR CON DISEÑO REDONDEADO ===
         $qr_size = 78;
         $qr_x = (215 - $qr_size) / 2;
         $qr_y = $pdf->GetY();
         
-        // Recuadro del QR: Ahora con blanco puro (255, 255, 255)
-        $pdf->SetFillColor(255, 255, 255);
+        // Recuadro del QR con esquinas redondeadas
+        $pdf->SetFillColor(275, 275, 2);
         $pdf->RoundedRect($qr_x - 4, $qr_y - 4, $qr_size + 8, $qr_size + 8, 5, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
