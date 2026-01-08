@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR para el evento ID 50339.
- * Version: 3.0.0
+ * Version: 3.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -57,14 +57,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
         $post_id = 50339;
 
-        // Datos asistente
+        /* -------- DATOS -------- */
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos = sanitize_text_field($request['apellidos'] ?? '');
         $nombre_completo = html_entity_decode(trim("$nombre $apellidos"), ENT_QUOTES, 'UTF-8');
 
-        // Datos evento
-        $titulo_evento = get_the_title($post_id);
+        $titulo_evento = html_entity_decode(
+            get_the_title($post_id),
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
+
         $ubicacion = html_entity_decode(
             get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible',
             ENT_QUOTES | ENT_HTML5,
@@ -80,9 +84,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $upload_dir = wp_upload_dir();
 
-        /**
-         * ---------- QR ----------
-         */
+        /* -------- QR -------- */
         $qr_url = home_url('/checkin/?') . http_build_query([
             'empresa' => $nombre_empresa,
             'nombre'  => $nombre_completo,
@@ -99,9 +101,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr_path = $upload_dir['basedir'] . '/qr_' . uniqid() . '.png';
         $qr->saveToFile($qr_path);
 
-        /**
-         * ---------- PDF ----------
-         */
+        /* -------- PDF -------- */
         $pdf = new TCPDF('P','mm','A4',true,'UTF-8',false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
@@ -115,9 +115,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y = 8;
 
-        /**
-         * ---------- Imagen ----------
-         */
+        /* -------- IMAGEN -------- */
         $img_url = get_the_post_thumbnail_url($post_id,'full');
         if ($img_url) {
             $img = optimizar_imagen_para_pdf($img_url,$upload_dir);
@@ -135,48 +133,47 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        /**
-         * ---------- Calendario ----------
-         */
-        $pdf->SetAbsY($y);
-
+        /* -------- CALENDARIO (ESTILO TARJETA) -------- */
         $cal_x = 20;
-        $cal_w = 38;
-        $cal_h = 35;
+        $cal_y = $y;
+        $cal_w = 40;
+        $cal_h = 48;
 
-        $pdf->SetFillColor(255,255,255);
-        $pdf->RoundedRect($cal_x,$y,$cal_w,$cal_h,3,'1111','F');
+        // Fondo
+        $pdf->SetFillColor(32,32,32);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,3,'1111','F');
 
-        $pdf->SetFillColor(30,30,30);
-        $pdf->RoundedRect($cal_x,$y,$cal_w,8,3,'1100','F');
+        // Banda mes
+        $pdf->SetFillColor(20,20,20);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,12,3,'1100','F');
 
+        // Mes
+        $pdf->SetFont('helvetica','B',11);
         $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->SetXY($cal_x,$y+1.5);
-        $pdf->Cell($cal_w,5,$mes,0,0,'C');
+        $pdf->SetXY($cal_x,$cal_y+3);
+        $pdf->Cell($cal_w,6,$mes,0,0,'C');
 
-        $pdf->SetTextColor(30,30,30);
-        $pdf->SetFont('helvetica','B',22);
-        $pdf->SetXY($cal_x,$y+10);
-        $pdf->Cell($cal_w,15,$dia,0,0,'C');
+        // Día
+        $pdf->SetFont('helvetica','B',26);
+        $pdf->SetXY($cal_x,$cal_y+16);
+        $pdf->Cell($cal_w,16,$dia,0,0,'C');
 
-        $pdf->SetFont('helvetica','',9);
-        $pdf->SetXY($cal_x,$y+26);
-        $pdf->Cell($cal_w,5,$ano,0,0,'C');
+        // Año
+        $pdf->SetFont('helvetica','',11);
+        $pdf->SetXY($cal_x,$cal_y+34);
+        $pdf->Cell($cal_w,8,$ano,0,0,'C');
 
-        /**
-         * ---------- Ubicación (icono vectorial) ----------
-         */
+        /* -------- UBICACIÓN -------- */
         $icon_x = $cal_x + $cal_w + 12;
 
         $pdf->SetDrawColor(80,80,80);
         $pdf->SetFillColor(80,80,80);
-        $pdf->Circle($icon_x,$y+8,1.5,0,360,'F');
-        $pdf->Line($icon_x,$y+9.5,$icon_x,$y+13);
+        $pdf->Circle($icon_x,$cal_y+8,1.5,0,360,'F');
+        $pdf->Line($icon_x,$cal_y+9.5,$icon_x,$cal_y+13);
 
         $pdf->SetFont('helvetica','B',11);
         $pdf->SetTextColor(80,80,80);
-        $pdf->SetXY($icon_x+4,$y+5);
+        $pdf->SetXY($icon_x+4,$cal_y+5);
         $pdf->Cell(0,5,'UBICACIÓN',0,1);
 
         $pdf->SetFont('helvetica','',11);
@@ -185,9 +182,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $y_after_location = $pdf->GetY();
 
-        /**
-         * ---------- Asistente ----------
-         */
+        /* -------- ASISTENTE -------- */
         $pdf->SetAbsY($y_after_location + 6);
 
         $pdf->SetFont('helvetica','B',22);
@@ -198,9 +193,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(100,100,105);
         $pdf->Cell(0,8,mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
 
-        /**
-         * ---------- QR ----------
-         */
+        /* -------- QR -------- */
         $y_qr = $pdf->GetY() + 4;
         $qr_size = 65;
         $qr_x = (210 - $qr_size) / 2;
@@ -209,9 +202,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x-4,$y_qr,$qr_size+8,$qr_size+8,4,'1111','F');
         $pdf->Image($qr_path,$qr_x,$y_qr+4,$qr_size,$qr_size);
 
-        /**
-         * ---------- Confirmación ----------
-         */
+        /* -------- CONFIRMADO -------- */
         $pdf->SetAbsY(265);
         $badge_w = 70;
         $badge_x = (210 - $badge_w) / 2;
@@ -223,9 +214,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(255,255,255);
         $pdf->Cell(0,9,'✓ ENTRADA CONFIRMADA',0,1,'C');
 
-        /**
-         * ---------- Guardar ----------
-         */
+        /* -------- GUARDAR -------- */
         $slug = preg_replace(
             '/[^a-z0-9]+/',
             '-',
