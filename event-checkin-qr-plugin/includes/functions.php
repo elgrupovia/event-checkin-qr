@@ -141,29 +141,42 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          */
         $cal_x = 14;
         $cal_y = 14;
-        $cal_w = 44;
-        $cal_h = 40;
+        $cal_w = 46;
+        $cal_h = 44;
 
-        $pdf->SetFillColor(255,255,255);
+        // Fondo principal oscuro
+        $pdf->SetFillColor(45,45,48);
         $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111','F');
 
-        $pdf->SetFillColor(30,30,30);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,9,4,'1100','F');
+        // Borde claro
+        $pdf->SetDrawColor(90,90,95);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111');
 
+        // Cabecera superior
+        $pdf->SetFillColor(30,30,32);
+        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,10,4,'1100','F');
+
+        // Anillas superiores
+        $pdf->SetFillColor(180,180,185);
+        $pdf->Circle($cal_x+10,$cal_y-1.5,1.6,0,360,'F');
+        $pdf->Circle($cal_x+$cal_w-10,$cal_y-1.5,1.6,0,360,'F');
+
+        // Mes
         $pdf->SetTextColor(255,255,255);
         $pdf->SetFont('helvetica','B',11);
         $pdf->SetXY($cal_x,$cal_y+2);
-        $pdf->Cell($cal_w,5,$mes,0,0,'C');
+        $pdf->Cell($cal_w,6,$mes,0,0,'C');
 
-        // Día GRANDE
-        $pdf->SetTextColor(30,30,30);
-        $pdf->SetFont('helvetica','B',38);
-        $pdf->SetXY($cal_x,$cal_y+10);
+        // Día (MUY GRANDE)
+        $pdf->SetFont('helvetica','B',40);
+        $pdf->SetXY($cal_x,$cal_y+12);
         $pdf->Cell($cal_w,20,$dia,0,0,'C');
 
-        $pdf->SetFont('helvetica','',10);
-        $pdf->SetXY($cal_x,$cal_y+30);
-        $pdf->Cell($cal_w,6,$ano,0,0,'C');
+        // Año
+        $pdf->SetFont('helvetica','',11);
+        $pdf->SetTextColor(210,210,215);
+        $pdf->SetXY($cal_x,$cal_y+33);
+        $pdf->Cell($cal_w,7,$ano,0,0,'C');
 
         /**
          * ---------- Ubicación ----------
