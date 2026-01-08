@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido: elementos alineados verticalmente sin solapamiento.
- * Version: 2.9.2
+ * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido: iconos Unicode corregidos.
+ * Version: 2.9.3
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -125,18 +125,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $y_cursor + 26);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
-        // Texto Ubicación (Usamos Dejavu Sans para asegurar que el icono se vea)
-        $pdf->SetFont('dejavusans', 'B', 11);
+        // Texto Ubicación - Sin emoji, usando símbolo de texto simple
+        $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetTextColor(80, 80, 80);
         $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 5);
-        $pdf->Cell(0, 5, '📍 UBICACIÓN', 0, 1, 'L');
+        $pdf->Cell(0, 5, chr(149) . ' UBICACION', 0, 1, 'L'); // Símbolo de punto en lugar de emoji
         
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->SetXY($cal_x + $cal_w + 10, $pdf->GetY() + 1);
-        $pdf->MultiCell(100, 5, $ubicacion, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetXY($cal_x + $cal_w + 10, $pdf->GetY());
+        $pdf->MultiCell(100, 4, $ubicacion, 0, 'L');
 
-        // 3. DATOS ASISTENTE (Actualizamos y_cursor para que no haya solapamiento)
-        $y_cursor += 42; 
+        // 3. DATOS ASISTENTE (Espaciado aumentado hacia abajo)
+        $y_cursor = $y_cursor + 44; 
         $pdf->SetAbsY($y_cursor);
         
         $pdf->SetTextColor(60, 60, 65); 
@@ -147,8 +147,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(100, 100, 105);
         $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // 4. QR CENTRADO (Actualizamos y_cursor de nuevo)
-        $y_cursor = $pdf->GetY() + 8; // Se posiciona 8mm debajo de la empresa
+        // 4. QR CENTRADO (Aumentamos el espaciado)
+        $y_cursor = $pdf->GetY() + 12; // Aumentado de 8 a 12
         $qr_size = 65; 
         $qr_x = (210 - $qr_size) / 2;
         
@@ -156,7 +156,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_cursor, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // 5. ENTRADA CONFIRMADA (POSICIÓN FIJA ABAJO)
+        // 5. ENTRADA CONFIRMADA (POSICIÓN FIJA ABAJO) - Sin emoji
         $y_final = 265; 
         $pdf->SetAbsY($y_final);
         $badge_w = 70;
@@ -164,8 +164,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetFont('dejavusans', 'B', 10);
-        $pdf->Cell(0, 9, '✓ ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY($badge_x, $y_final);
+        $pdf->Cell($badge_w, 9, chr(252) . ' ENTRADA CONFIRMADA', 0, 1, 'C'); // Símbolo en lugar de emoji
 
         // Finalizar
         $pdf_filename = 'entrada_' . preg_replace('/[^a-z0-9]+/', '-', strtolower($nombre_completo)) . '_' . time() . '.pdf';
@@ -178,13 +179,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         update_post_meta($post_id, '_asistentes', $asistentes);
 
     } catch (Exception $e) {
-        error_log("❌ Error PDF: " . $e->getMessage());
+        error_log("Error PDF: " . $e->getMessage());
     }
 }
 
 /**
  * ---------------------------
- * Manejador de Check-in y Admin (Igual que antes)
+ * Manejador de Check-in y Admin
  * ---------------------------
  */
 add_action('template_redirect', function(){
@@ -200,7 +201,7 @@ add_action('template_redirect', function(){
         ];
         update_post_meta($post_id, '_asistentes', $asistentes);
         echo "<div style='text-align:center;font-family:sans-serif;margin-top:100px;'>";
-        echo "<div style='font-size:80px;color:#4CAF50;'>✅</div>";
+        echo "<div style='font-size:80px;color:#4CAF50;'>OK</div>";
         echo "<h1 style='color:#333;'>Check-in confirmado</h1>";
         echo "<p style='font-size:20px;'>Bienvenido/a: <br><strong style='font-size:30px;'>" . esc_html($nombre) . "</strong></p>";
         echo "</div>";
@@ -210,7 +211,7 @@ add_action('template_redirect', function(){
 
 add_action('admin_menu', function() {
     add_submenu_page('edit.php?post_type=eventos', 'Asistentes', 'Asistentes QR', 'manage_options', 'eventos-asistentes', function() {
-        echo '<div class="wrap"><h1>🧾 Asistentes Registrados</h1>';
+        echo '<div class="wrap"><h1>Asistentes Registrados</h1>';
         $post_id = 50339;
         $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
         echo "<h2>" . esc_html(get_the_title($post_id)) . " (ID: 50339)</h2>";
