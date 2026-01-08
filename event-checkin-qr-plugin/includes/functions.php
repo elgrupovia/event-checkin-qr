@@ -113,7 +113,7 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
  */
 add_action('jet-form-builder/custom-action/inscripciones_qr','generar_qr_pdf_personalizado',10,3);
 /**
- * Generar PDF con QR (Diseño Mejorado con Calendario)
+ * Generar PDF con QR (Fondo original + Calendario nuevo)
  */
 function generar_qr_pdf_personalizado($request, $action_handler) {
     try {
@@ -131,10 +131,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
         
-        // Formateo de fecha para el calendario
         $fecha_timestamp = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
         $dia = date('d', $fecha_timestamp);
-        $mes_nombre = strtoupper(date_i18n('M', $fecha_timestamp)); // Abr. en español si WP está en ES
+        $mes_nombre = strtoupper(date_i18n('M', $fecha_timestamp));
         $ano = date('Y', $fecha_timestamp);
 
         $base_url = home_url('/checkin/');
@@ -154,115 +153,115 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
         $pdf->SetAutoPageBreak(false, 0); 
-        $pdf->SetMargins(10, 10, 10); 
+        $pdf->SetMargins(8, 8, 8); 
         $pdf->AddPage();
         
-        // 1. Fondo del Ticket
-        $pdf->SetFillColor(255, 255, 255);
-        $pdf->RoundedRect(10, 10, 190, 277, 5, '1111', 'F');
+        // VOLVEMOS AL FONDO GRIS CLARO ORIGINAL
+        $pdf->SetFillColor(245, 245, 247);
+        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'F');
 
-        $y_dinamica = 10;
+        $y_dinamica = 8;
 
-        // 2. Imagen de Cabecera (Bordes redondeados superiores)
+        // Foto de Cabecera (4 esquinas redondeadas como antes)
         if ($post_id) {
             $imagen_url = get_the_post_thumbnail_url($post_id, 'full');
             if ($imagen_url) {
                 $imagen_info = optimizar_imagen_para_pdf($imagen_url, $upload_dir);
                 if (file_exists($imagen_info['path'])) {
-                    $ancho_pdf = 190; 
-                    $alto_pdf = 75; // Altura fija para armonía visual
+                    list($ancho_orig, $alto_orig) = getimagesize($imagen_info['path']);
+                    $ancho_pdf = 194; 
+                    $alto_pdf = ($alto_orig * $ancho_pdf) / $ancho_orig;
                     
                     $pdf->StartTransform();
-                    $pdf->RoundedRect(10, 10, $ancho_pdf, $alto_pdf, 5, '1100', 'CNZ');
-                    $pdf->Image($imagen_info['path'], 10, 10, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
+                    $pdf->RoundedRect(8, 8, $ancho_pdf, $alto_pdf, 6, '1111', 'CNZ');
+                    $pdf->Image($imagen_info['path'], 8, 8, $ancho_pdf, $alto_pdf, '', '', 'T', false, 300);
                     $pdf->StopTransform();
 
-                    $y_dinamica = 10 + $alto_pdf + 10;
+                    $y_dinamica = 8 + $alto_pdf + 8;
                 }
             }
         }
 
-        // 3. BLOQUE CALENDARIO Y UBICACIÓN (Estilo Imagen Adjunta)
+        // BORDE EXTERIOR (D)
+        $pdf->SetDrawColor(200, 200, 205);
+        $pdf->SetLineWidth(0.5);
+        $pdf->RoundedRect(8, 8, 194, 279, 6, '1111', 'D');
+
+        // BLOQUE CALENDARIO Y UBICACIÓN
         $pdf->SetAbsY($y_dinamica);
-        $cal_x = 20;
-        $cal_w = 35;
+        $cal_x = 15;
+        $cal_w = 40;
         $cal_h = 35;
 
-        // Cuadro Calendario
-        $pdf->SetFillColor(240, 240, 240); // Fondo gris suave
+        // Cuadro Calendario (Estilo imagen)
+        $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $y_dinamica, $cal_w, $cal_h, 3, '1111', 'F');
         
-        // Mes (Franja superior oscura)
-        $pdf->SetFillColor(40, 40, 40);
+        // Franja Mes (Negra)
+        $pdf->SetFillColor(30, 30, 30);
         $pdf->RoundedRect($cal_x, $y_dinamica, $cal_w, 8, 3, '1100', 'F');
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->SetXY($cal_x, $y_dinamica + 1.5);
         $pdf->Cell($cal_w, 5, $mes_nombre, 0, 0, 'C');
 
-        // Día
-        $pdf->SetTextColor(40, 40, 40);
+        // Día y Año
+        $pdf->SetTextColor(30, 30, 30);
         $pdf->SetFont('helvetica', 'B', 22);
         $pdf->SetXY($cal_x, $y_dinamica + 10);
         $pdf->Cell($cal_w, 15, $dia, 0, 0, 'C');
-
-        // Año
         $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetXY($cal_x, $y_dinamica + 25);
+        $pdf->SetXY($cal_x, $y_dinamica + 26);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
-        // 4. Texto de Ubicación y Evento al lado del calendario
-        $info_x = $cal_x + $cal_w + 10;
-        $pdf->SetTextColor(30, 30, 30);
+        // Texto Ubicación (al lado)
+        $info_x = $cal_x + $cal_w + 8;
+        $pdf->SetTextColor(50, 50, 50);
+        $pdf->SetFont('helvetica', 'B', 12);
         $pdf->SetXY($info_x, $y_dinamica + 2);
-        $pdf->SetFont('helvetica', 'B', 14);
-        $pdf->MultiCell(110, 7, mb_strtoupper($titulo_a_mostrar, 'UTF-8'), 0, 'L');
+        $pdf->MultiCell(120, 6, "📍 " . mb_strtoupper($titulo_a_mostrar, 'UTF-8'), 0, 'L');
         
-        $pdf->SetXY($info_x, $pdf->GetY() + 2);
-        $pdf->SetFont('helvetica', '', 11);
+        $pdf->SetFont('helvetica', '', 10);
         $pdf->SetTextColor(100, 100, 100);
-        $pdf->MultiCell(110, 5, "📍 " . $ubicacion, 0, 'L');
+        $pdf->SetXY($info_x, $pdf->GetY() + 1);
+        $pdf->MultiCell(120, 5, $ubicacion, 0, 'L');
 
-        $y_dinamica = $pdf->GetY() + 15;
+        $y_dinamica = $pdf->GetY() + 12;
 
-        // 5. SEPARADOR ARMONIOSO
-        $pdf->SetDrawColor(230, 230, 230);
-        $pdf->Line(20, $y_dinamica, 190, $y_dinamica);
-        $y_dinamica += 10;
-
-        // 6. DATOS DEL ASISTENTE
-        $pdf->SetAbsY($y_dinamica);
-        $pdf->SetTextColor(40, 40, 40);
-        $pdf->SetFont('helvetica', 'B', 22);
-        $pdf->Cell(0, 12, $nombre_completo, 0, 1, 'C');
-        
-        $pdf->SetFont('helvetica', '', 14);
-        $pdf->SetTextColor(80, 80, 80);
-        $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
-
-        // 7. Badge de Confirmación
-        $pdf->Ln(5);
+        // BADGE CONFIRMACIÓN
+        $badge_w = 80;
+        $badge_x = (210 - $badge_w) / 2;
         $pdf->SetFillColor(76, 175, 80);
+        $pdf->RoundedRect($badge_x, $y_dinamica, $badge_w, 10, 3, '1111', 'F');
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
-        $badge_w = 60;
-        $pdf->RoundedRect((210 - $badge_w) / 2, $pdf->GetY(), $badge_w, 8, 4, '1111', 'F');
-        $pdf->Cell(0, 8, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->SetXY($badge_x, $y_dinamica + 2.5);
+        $pdf->Cell($badge_w, 5, '✓ ENTRADA CONFIRMADA', 0, 1, 'C');
 
-        // 8. QR (Fondo limpio)
+        // DATOS ASISTENTE
         $pdf->Ln(10);
-        $qr_size = 65;
-        $qr_x = (210 - $qr_size) / 2;
-        $pdf->Image($qr_path, $qr_x, $pdf->GetY(), $qr_size, $qr_size, 'PNG', '', '', true, 300);
+        $pdf->SetTextColor(60, 60, 65); 
+        $pdf->SetFont('helvetica', 'B', 20);
+        $pdf->Cell(0, 10, $nombre_completo, 0, 1, 'C');
+        
+        $pdf->SetFont('helvetica', 'B', 13);
+        $pdf->SetTextColor(100, 100, 105);
+        $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // Guardar y Finalizar
+        // QR
+        $pdf->Ln(5);
+        $qr_size = 70;
+        $qr_x = (210 - $qr_size) / 2;
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect($qr_x - 4, $pdf->GetY(), $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
+        $pdf->Image($qr_path, $qr_x, $pdf->GetY() + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
+
+        // Finalizar
         $pdf_filename = 'entrada_' . preg_replace('/[^a-z0-9]+/', '-', strtolower($nombre_completo)) . '_' . time() . '.pdf';
         $pdf_path = $upload_dir['basedir'] . '/' . $pdf_filename;
         $pdf->Output($pdf_path, 'F');
-        
         @unlink($qr_path);
-        
-        // Registro en Meta del post
+
         if ($post_id) {
             $asistentes = get_post_meta($post_id, '_asistentes', true) ?: [];
             $asistentes[] = [
@@ -272,7 +271,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             ];
             update_post_meta($post_id, '_asistentes', $asistentes);
         }
-
     } catch (Exception $e) {
         error_log("❌ Error PDF: " . $e->getMessage());
     }
