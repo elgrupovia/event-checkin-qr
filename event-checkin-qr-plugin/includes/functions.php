@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido: iconos Unicode corregidos.
- * Version: 2.9.3
+ * Description: Genera PDF con QR para el evento ID 50339. Diseño corregido: iconos como imágenes.
+ * Version: 2.9.4
  * */
 
 if (!defined('ABSPATH')) exit;
@@ -35,6 +35,54 @@ function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
 }
 
 /**
+ * Crear iconos simples como PNG
+ */
+function crear_icono_ubicacion($upload_dir) {
+    $icono_path = $upload_dir['basedir'] . '/icono_ubicacion.png';
+    if (!file_exists($icono_path)) {
+        $img = imagecreate(20, 20);
+        $blanco = imagecolorallocate($img, 255, 255, 255);
+        $gris = imagecolorallocate($img, 80, 80, 80);
+        imagefill($img, 0, 0, $blanco);
+        
+        // Círculo punteador
+        imagefilledellipse($img, 10, 8, 4, 4, $gris);
+        // Triángulo inferior (simplificado como líneas)
+        imageline($img, 6, 10, 10, 16, $gris);
+        imageline($img, 14, 10, 10, 16, $gris);
+        imageline($img, 6, 10, 14, 10, $gris);
+        
+        imagepng($img, $icono_path);
+        imagedestroy($img);
+    }
+    return $icono_path;
+}
+
+function crear_icono_check($upload_dir) {
+    $icono_path = $upload_dir['basedir'] . '/icono_check.png';
+    if (!file_exists($icono_path)) {
+        $img = imagecreate(24, 24);
+        $blanco = imagecolorallocate($img, 255, 255, 255);
+        $verde = imagecolorallocate($img, 76, 175, 80);
+        imagefill($img, 0, 0, $blanco);
+        
+        // Círculo verde de fondo
+        imagefilledellipse($img, 12, 12, 22, 22, $verde);
+        
+        // Check blanco (líneas)
+        $blanco_color = imagecolorallocate($img, 255, 255, 255);
+        imageline($img, 7, 12, 10, 15, $blanco_color);
+        imageline($img, 10, 15, 17, 8, $blanco_color);
+        imageline($img, 10, 16, 17, 9, $blanco_color);
+        imageline($img, 8, 12, 11, 15, $blanco_color);
+        
+        imagepng($img, $icono_path);
+        imagedestroy($img);
+    }
+    return $icono_path;
+}
+
+/**
  * ---------------------------
  * Generar PDF con QR (ID Evento: 50339)
  * ---------------------------
@@ -60,6 +108,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $ano = date('Y', $fecha_timestamp);
 
         $upload_dir = wp_upload_dir();
+        
+        // Crear iconos
+        $icono_ubicacion = crear_icono_ubicacion($upload_dir);
+        $icono_check = crear_icono_check($upload_dir);
         
         // Generar QR
         $params = [
@@ -125,18 +177,20 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $y_cursor + 26);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
-        // Texto Ubicación - Sin emoji, usando símbolo de texto simple
+        // Texto Ubicación con icono
         $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 5);
-        $pdf->Cell(0, 5, chr(149) . ' UBICACION', 0, 1, 'L'); // Símbolo de punto en lugar de emoji
+        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 4);
+        $pdf->Image($icono_ubicacion, $cal_x + $cal_w + 8, $y_cursor + 3, 4, 4, 'PNG', '', '', false, 300);
+        $pdf->SetXY($cal_x + $cal_w + 14, $y_cursor + 4);
+        $pdf->Cell(0, 4, 'UBICACION', 0, 1, 'L');
         
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetXY($cal_x + $cal_w + 10, $pdf->GetY());
+        $pdf->SetXY($cal_x + $cal_w + 10, $y_cursor + 10);
         $pdf->MultiCell(100, 4, $ubicacion, 0, 'L');
 
-        // 3. DATOS ASISTENTE (Espaciado aumentado hacia abajo)
-        $y_cursor = $y_cursor + 44; 
+        // 3. DATOS ASISTENTE - POSICIÓN ACTUALIZADA (Mayor altura)
+        $y_cursor = $y_cursor + 48; 
         $pdf->SetAbsY($y_cursor);
         
         $pdf->SetTextColor(60, 60, 65); 
@@ -147,8 +201,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetTextColor(100, 100, 105);
         $pdf->Cell(0, 8, mb_strtoupper($nombre_empresa, 'UTF-8'), 0, 1, 'C');
 
-        // 4. QR CENTRADO (Aumentamos el espaciado)
-        $y_cursor = $pdf->GetY() + 12; // Aumentado de 8 a 12
+        // 4. QR CENTRADO
+        $y_cursor = $pdf->GetY() + 15; // Mayor separación
         $qr_size = 65; 
         $qr_x = (210 - $qr_size) / 2;
         
@@ -156,17 +210,22 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_cursor, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_cursor + 4, $qr_size, $qr_size, 'PNG', '', '', true, 300);
 
-        // 5. ENTRADA CONFIRMADA (POSICIÓN FIJA ABAJO) - Sin emoji
+        // 5. ENTRADA CONFIRMADA - POSICIÓN FIJA ABAJO con icono
         $y_final = 265; 
         $pdf->SetAbsY($y_final);
-        $badge_w = 70;
+        $badge_w = 75;
         $badge_x = (210 - $badge_w) / 2;
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $y_final, $badge_w, 9, 3, '1111', 'F');
+        
+        // Icono check
+        $pdf->Image($icono_check, $badge_x + 3, $y_final + 1.5, 6, 6, 'PNG', '', '', false, 300);
+        
+        // Texto
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($badge_x, $y_final);
-        $pdf->Cell($badge_w, 9, chr(252) . ' ENTRADA CONFIRMADA', 0, 1, 'C'); // Símbolo en lugar de emoji
+        $pdf->SetXY($badge_x + 10, $y_final + 0.5);
+        $pdf->Cell($badge_w - 10, 8, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
         // Finalizar
         $pdf_filename = 'entrada_' . preg_replace('/[^a-z0-9]+/', '-', strtolower($nombre_completo)) . '_' . time() . '.pdf';
