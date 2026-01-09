@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339 con calendario superpuesto.
- * Version: 3.2.0
+ * Description: Genera PDF con QR para el evento ID 50339 con calendario superpuesto y badge optimizado.
+ * Version: 3.3.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -70,7 +70,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $mes = strtoupper(date_i18n('M', $ts));
         $ano = date('Y', $ts);
         
-        // Fecha formateada: dd/mm/yyyy hh:mm
         $fecha_formateada = date('d/m/Y H:i', $ts);
 
         $upload_dir = wp_upload_dir();
@@ -104,14 +103,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(false,0);
         $pdf->AddPage();
 
-        // Fondo de la tarjeta
+        // Fondo de la tarjeta (Gris muy claro)
         $pdf->SetFillColor(245,245,247);
         $pdf->RoundedRect(8,8,194,279,6,'1111','F');
 
         $y_actual = 8;
 
         /**
-         * 1. IMAGEN SUPERIOR (Fondo)
+         * 1. IMAGEN SUPERIOR
          */
         $img_url = get_the_post_thumbnail_url($post_id,'full');
         $alto_imagen = 0;
@@ -123,10 +122,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $ancho_canvas = 194;
                 $alto_imagen = ($h * $ancho_canvas) / $w;
                 
-                // Limitar altura máxima de la imagen
-                if ($alto_imagen > 100) {
-                    $alto_imagen = 100;
-                }
+                if ($alto_imagen > 100) $alto_imagen = 100;
 
                 $pdf->StartTransform();
                 $pdf->RoundedRect(8, 8, $ancho_canvas, $alto_imagen, 6, '1111', 'CNZ');
@@ -138,18 +134,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * 2. CALENDARIO (Superpuesto arriba a la izquierda)
+         * 2. CALENDARIO SUPERPUESTO
          */
         $cal_x = 14; 
         $cal_y = 14;
         $cal_w = 32;
         $cal_h = 30;
 
-        // Sombra/Fondo blanco del calendario
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 3, '1111', 'F');
-
-        // Cabecera mes (Negro)
         $pdf->SetFillColor(30, 30, 30);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 7, 3, '1100', 'F');
 
@@ -158,56 +151,56 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $cal_y + 1);
         $pdf->Cell($cal_w, 5, $mes, 0, 0, 'C');
 
-        // Día - MUCHO MÁS GRANDE
         $pdf->SetTextColor(30, 30, 30);
         $pdf->SetFont('helvetica', 'B', 26);
         $pdf->SetXY($cal_x, $cal_y + 8);
         $pdf->Cell($cal_w, 14, $dia, 0, 0, 'C');
 
-        // Año
         $pdf->SetFont('helvetica', '', 9);
         $pdf->SetXY($cal_x, $cal_y + 22);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
         /**
-         * 3. BADGE CONFIRMACIÓN (Debajo de la imagen)
+         * 3. BADGE CONFIRMACIÓN (ANCHO REDUCIDO Y CENTRADO)
          */
-        $y_actual += 6;
-        $badge_w = 170;
-        $badge_x = 20;
+        $y_actual += 8;
+        $badge_w = 110; // Ancho reducido para mayor elegancia
+        $badge_x = (210 - $badge_w) / 2; // Centrado exacto
+        $badge_h = 10;
 
-        $pdf->SetFillColor(76, 175, 80);
-        $pdf->RoundedRect($badge_x, $y_actual, $badge_w, 10, 3, '1111', 'F');
+        // Color Verde Esmeralda
+        $pdf->SetFillColor(46, 184, 114); 
+        $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 3, '1111', 'F');
 
-        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetXY($badge_x, $y_actual + 1);
-        $pdf->Cell($badge_w, 8, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->SetXY($badge_x, $y_actual);
+        // El símbolo ✔ se renderiza bien en Helvetica
+        $pdf->Cell($badge_w, $badge_h, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
 
-        $y_actual += 12;
+        $y_actual += 15;
 
         /**
          * 4. FECHA Y UBICACIÓN
          */
         $pdf->SetAbsY($y_actual);
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(100, 100, 100);
+        $pdf->SetTextColor(120, 120, 120);
         
-        // Línea: FECHA | LUGAR
         $fecha_texto = 'FECHA: ' . $fecha_formateada;
         $lugar_texto = 'LUGAR: ' . $ubicacion;
         
         $pdf->SetX(15);
-        $pdf->MultiCell(0, 5, $fecha_texto . ' | ' . $lugar_texto, 0, 'C');
+        $pdf->MultiCell(180, 5, $fecha_texto . '  |  ' . $lugar_texto, 0, 'C');
 
-        $y_actual = $pdf->GetY() + 4;
+        $y_actual = $pdf->GetY() + 6;
 
         /**
          * 5. ASISTENTE
          */
         $pdf->SetAbsY($y_actual);
         $pdf->SetFont('helvetica', 'B', 24);
-        $pdf->SetTextColor(60, 60, 65);
+        $pdf->SetTextColor(40, 40, 45);
         $pdf->Cell(0, 12, $nombre_completo, 0, 1, 'C');
 
         $pdf->SetFont('helvetica', 'B', 14);
@@ -217,12 +210,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         /**
          * 6. QR
          */
-        $y_qr = $pdf->GetY() + 8;
-        $qr_size = 65;
+        $y_qr = $pdf->GetY() + 10;
+        $qr_size = 60;
         $qr_x = (210 - $qr_size) / 2;
 
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
+        // Recuadro blanco para el QR con una pequeña sombra visual (borde gris muy tenue)
+        $pdf->SetDrawColor(230, 230, 230);
+        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'DF');
         $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
 
         /**
