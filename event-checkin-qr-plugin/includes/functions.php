@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
- * Description: Genera PDF con QR para el evento ID 50339 con calendario superpuesto y badge optimizado.
- * Version: 3.4.2
+ * Description: Genera PDF con QR para el evento ID 50339 con calendario minimalista y badge optimizado.
+ * Version: 3.5.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -55,7 +55,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // Evento
         $titulo_evento = get_the_title($post_id);
-
         $ubicacion_raw = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
         $ubicacion = html_entity_decode($ubicacion_raw, ENT_QUOTES, 'UTF-8');
 
@@ -70,7 +69,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $upload_dir = wp_upload_dir();
 
         /**
-         * QR
+         * GENERACIÓN DE QR
          */
         $qr_url = home_url('/checkin/?') . http_build_query([
             'empresa' => $nombre_empresa,
@@ -89,7 +88,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $qr->saveToFile($qr_path);
 
         /**
-         * PDF
+         * CONFIGURACIÓN PDF
          */
         $pdf = new TCPDF('P','mm','A4',true,'UTF-8',false);
         $pdf->setPrintHeader(false);
@@ -98,11 +97,12 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(false,0);
         $pdf->AddPage();
 
-        $pdf->SetFillColor(245,245,247);
-        $pdf->RoundedRect(8,8,194,279,6,'1111','F');
+        // Fondo de la tarjeta principal
+        $pdf->SetFillColor(248, 249, 250);
+        $pdf->RoundedRect(8,8,194,279,4,'1111','F');
 
         /**
-         * IMAGEN SUPERIOR
+         * IMAGEN CABECERA
          */
         $y_actual = 8;
         $img_url = get_the_post_thumbnail_url($post_id,'full');
@@ -114,138 +114,128 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
                 $alto = min(($h * 194) / $w, 100);
 
                 $pdf->StartTransform();
-                $pdf->RoundedRect(8,8,194,$alto,6,'1111','CNZ');
+                $pdf->RoundedRect(8,8,194,$alto,4,'1100','CNZ');
                 $pdf->Image($img['path'],8,8,194,$alto);
                 $pdf->StopTransform();
-
                 $y_actual = 8 + $alto;
             }
         }
 
-       /**
-         * CALENDARIO REALISTA "COLGADO"
+        /**
+         * CALENDARIO SIMPLE (DISEÑO LIMPIO)
          */
-        $cal_x = 14; 
-        $cal_y = 14; 
-        $cal_w = 35; 
-        $cal_h = 40; // Aumentamos un poco el alto para la línea y el año
+        $cal_x = 15; 
+        $cal_y = 15; 
+        $cal_w = 32; 
+        $cal_h = 34; 
 
-        // 1. Sombra de profundidad (efecto realista)
-        $pdf->SetFillColor(200, 200, 200);
-        $pdf->RoundedRect($cal_x + 0.5, $cal_y + 0.5, $cal_w, $cal_h, 3, '1111', 'F');
-
-        // 2. Cuerpo blanco principal
+        // Fondo blanco y borde sutil
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 3, '1111', 'F');
-        
-        // 3. Encabezado (Azul Navy Profundo)
-        $pdf->SetFillColor(44, 62, 80); 
-        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 10, 3, '1100', 'F');
+        $pdf->SetDrawColor(220, 220, 220);
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2, '1111', 'DF');
 
-        // --- DETALLE: Agujeros de calendario colgado ---
-        $pdf->SetFillColor(245, 245, 247); // Color del fondo del PDF para que parezca hueco
-        $pdf->Circle($cal_x + ($cal_w/4), $cal_y + 3, 1.2);
-        $pdf->Circle($cal_x + ($cal_w*3/4), $cal_y + 3, 1.2);
+        // Franja del Mes (Azul Oscuro/Navy)
+        $pdf->SetFillColor(33, 37, 41); 
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 9, 2, '1100', 'F');
 
-        // 4. Texto del Mes
+        // Texto Mes
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY($cal_x, $cal_y + 3.5);
+        $pdf->SetXY($cal_x, $cal_y + 2.5);
         $pdf->Cell($cal_w, 5, $mes, 0, 0, 'C');
 
-        // 5. El Día (Número muy grande)
-        $pdf->SetTextColor(30, 30, 30);
-        $pdf->SetFont('helvetica', 'B', 44);
-        $pdf->SetXY($cal_x, $cal_y + 11);
+        // Texto Día
+        $pdf->SetTextColor(33, 37, 41);
+        $pdf->SetFont('helvetica', 'B', 36);
+        $pdf->SetXY($cal_x, $cal_y + 10);
         $pdf->Cell($cal_w, 18, $dia, 0, 0, 'C');
 
-        // --- LÍNEA GRIS DIVISORIA ---
-        $pdf->SetDrawColor(210, 210, 210);
-        $pdf->SetLineWidth(0.3);
-        $pdf->Line($cal_x + 5, $cal_y + 31, $cal_x + $cal_w - 5, $cal_y + 31);
-
-        // 6. El Año (Debajo de la línea)
-        $pdf->SetTextColor(80, 80, 80);
-        $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($cal_x, $cal_y + 32.5);
+        // Texto Año
+        $pdf->SetTextColor(100, 100, 100);
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->SetXY($cal_x, $cal_y + 27);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
-        /**
-         * BADGE CONFIRMACIÓN (Centrado Dinámico Real)
-         */
-        $y_actual += 8;
-        $badge_w = 145;
-        $badge_x = (210 - $badge_w) / 2;
-        $badge_h = 11;
 
-        // Dibujar fondo del badge
-        $pdf->SetFillColor(76, 175, 80);
-        $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 3, '1111', 'F');
+        /**
+         * BADGE DE CONFIRMACIÓN
+         */
+        $y_actual += 10;
+        $badge_w = 140;
+        $badge_x = (210 - $badge_w) / 2;
+        $badge_h = 10;
+
+        $pdf->SetFillColor(40, 167, 69); // Verde éxito
+        $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 2, '1111', 'F');
 
         $pdf->SetTextColor(255, 255, 255);
-        $text_y = $y_actual + 2.5;
-
-        // --- CÁLCULO DE CENTRADO DINÁMICO ---
         $texto_confirmacion = 'ENTRADA CONFIRMADA';
-        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetFont('helvetica', 'B', 11);
+        
         $ancho_texto_real = $pdf->GetStringWidth($texto_confirmacion);
-        
-        $tick_w  = 6;  // Ancho del icono
-        $space   = 2;  // Espacio entre icono y texto
-        
-        // Sumamos todo el contenido interno para saber cuánto mide el bloque
-        $total_contenido_w = $tick_w + $space + $ancho_texto_real;
+        $tick_w = 6;
+        $space = 2;
+        $total_w = $tick_w + $space + $ancho_texto_real;
+        $start_x = (210 - $total_w) / 2;
 
-        // La X inicial será la mitad del PDF (105) menos la mitad de lo que mide el bloque
-        $start_x = (210 - $total_contenido_w) / 2;
+        // Icono Check
+        $pdf->SetFont('zapfdingbats', '', 11);
+        $pdf->SetXY($start_x, $y_actual + 2.5);
+        $pdf->Cell($tick_w, 5, '3', 0, 0, 'C');
 
-        // Dibujar Tick (Icono)
-        $pdf->SetFont('zapfdingbats', '', 12);
-        $pdf->SetXY($start_x, $text_y);
-        $pdf->Cell($tick_w, 6, '3', 0, 0, 'C');
-
-        // Dibujar Texto
-        $pdf->SetFont('helvetica', 'B', 12);
-        $pdf->SetXY($start_x + $tick_w + $space, $text_y);
-        $pdf->Cell($ancho_texto_real, 6, $texto_confirmacion, 0, 0, 'L');
+        // Texto
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetXY($start_x + $tick_w + $space, $y_actual + 2.5);
+        $pdf->Cell($ancho_texto_real, 5, $texto_confirmacion, 0, 0, 'L');
 
         /**
-         * ✅ FECHA Y UBICACIÓN (AHORA DEBAJO DEL BADGE)
+         * DETALLES DEL EVENTO
          */
-        $y_actual += 16;
-        $pdf->SetFont('helvetica','',10);
+        $y_actual += 15;
+        $pdf->SetFont('helvetica','',9);
         $pdf->SetTextColor(100,100,100);
-        $pdf->SetXY(15, $y_actual);
-        $pdf->MultiCell(180,5,'FECHA: '.$fecha_formateada.' | LUGAR: '.$ubicacion,0,'C');
+        $pdf->SetXY(10, $y_actual);
+        $pdf->MultiCell(190,5,strtoupper($titulo_evento),0,'C');
+        
+        $pdf->Ln(1);
+        $pdf->SetFont('helvetica', 'B', 9);
+        $pdf->Cell(0,5,'FECHA: '.$fecha_formateada.'  |  LUGAR: '.$ubicacion, 0, 1, 'C');
 
         /**
-         * ASISTENTE
+         * DATOS ASISTENTE
          */
-        $pdf->Ln(6);
-        $pdf->SetFont('helvetica','B',24);
-        $pdf->SetTextColor(60,60,65);
+        $pdf->Ln(8);
+        $pdf->SetFont('helvetica','B',26);
+        $pdf->SetTextColor(33, 37, 41);
         $pdf->Cell(0,12,$nombre_completo,0,1,'C');
 
-        $pdf->SetFont('helvetica','B',14);
-        $pdf->SetTextColor(100,100,105);
+        $pdf->SetFont('helvetica','',14);
+        $pdf->SetTextColor(73, 80, 87);
         $pdf->Cell(0,8,mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
 
         /**
-         * QR
+         * CÓDIGO QR
          */
         $y_qr = $pdf->GetY() + 10;
-        $qr_size = 65;
+        $qr_size = 60;
         $qr_x = (210 - $qr_size) / 2;
 
         $pdf->SetFillColor(255,255,255);
-        $pdf->RoundedRect($qr_x - 4,$y_qr,$qr_size + 8,$qr_size + 8,4,'1111','F');
-        $pdf->Image($qr_path,$qr_x,$y_qr + 4,$qr_size,$qr_size);
+        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 3, '1111', 'F');
+        $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
 
+        /**
+         * SALIDA
+         */
         $slug = preg_replace('/[^a-z0-9]+/','-',strtolower(remove_accents($nombre_completo)));
         $pdf->Output($upload_dir['basedir'].'/entrada_'.$slug.'_'.time().'.pdf','F');
 
+        // Limpieza de archivos temporales
         @unlink($qr_path);
+        if (isset($img['tmp']) && file_exists($img['tmp'])) {
+            @unlink($img['tmp']);
+        }
 
     } catch (Exception $e) {
-        error_log('❌ Error PDF: '.$e->getMessage());
+        error_log('❌ Error PDF Check-in: '.$e->getMessage());
     }
 }
