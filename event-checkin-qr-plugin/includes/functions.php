@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR para el evento ID 50339.
- * Version: 3.0.1
+ * Version: 3.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -65,11 +65,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // Datos evento
         $titulo_evento = get_the_title($post_id);
-        $ubicacion = html_entity_decode(
-            get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible',
-            ENT_QUOTES | ENT_HTML5,
-            'UTF-8'
-        );
+        $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
 
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
         $ts = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
@@ -109,16 +105,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(false,0);
         $pdf->AddPage();
 
-        /**
-         * ---------- Fondo ----------
-         */
+        // Fondo
         $pdf->SetFillColor(245,245,247);
         $pdf->RoundedRect(8,8,194,279,6,'1111','F');
+
+        $y = 8;
 
         /**
          * ---------- Imagen ----------
          */
-        $y = 8;
         $img_url = get_the_post_thumbnail_url($post_id,'full');
         if ($img_url) {
             $img = optimizar_imagen_para_pdf($img_url,$upload_dir);
@@ -137,53 +132,39 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * ---------- Calendario (ARRIBA IZQUIERDA SOBRE LA IMAGEN)
-         */
-       $cal_x = 14;
-    $cal_y = 14;
-    $cal_w = 46;
-    $cal_h = 44;
-
-    // Fondo principal oscuro
-    $pdf->SetFillColor(45,45,48);
-    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111','F');
-
-    // Borde claro
-    $pdf->SetDrawColor(90,90,95);
-    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111');
-
-    // Cabecera superior
-    $pdf->SetFillColor(30,30,32);
-    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,10,4,'1100','F');
-
-    // Anillas superiores
-    $pdf->SetFillColor(180,180,185);
-    $pdf->Circle($cal_x+10,$cal_y-1.5,1.6,0,360,'F');
-    $pdf->Circle($cal_x+$cal_w-10,$cal_y-1.5,1.6,0,360,'F');
-
-    // Mes
-    $pdf->SetTextColor(255,255,255);
-    $pdf->SetFont('helvetica','B',11);
-    $pdf->SetXY($cal_x,$cal_y+2);
-    $pdf->Cell($cal_w,6,$mes,0,0,'C');
-
-    // Día (MUY GRANDE)
-    $pdf->SetFont('helvetica','B',40);
-    $pdf->SetXY($cal_x,$cal_y+12);
-    $pdf->Cell($cal_w,20,$dia,0,0,'C');
-
-    // Año
-    $pdf->SetFont('helvetica','',11);
-    $pdf->SetTextColor(210,210,215);
-    $pdf->SetXY($cal_x,$cal_y+33);
-    $pdf->Cell($cal_w,7,$ano,0,0,'C');
-
-        /**
-         * ---------- Ubicación ----------
+         * ---------- Calendario ----------
          */
         $pdf->SetAbsY($y);
 
-        $icon_x = 20;
+        $cal_x = 20;
+        $cal_w = 38;
+        $cal_h = 35;
+
+        $pdf->SetFillColor(255,255,255);
+        $pdf->RoundedRect($cal_x,$y,$cal_w,$cal_h,3,'1111','F');
+
+        $pdf->SetFillColor(30,30,30);
+        $pdf->RoundedRect($cal_x,$y,$cal_w,8,3,'1100','F');
+
+        $pdf->SetTextColor(255,255,255);
+        $pdf->SetFont('helvetica','B',10);
+        $pdf->SetXY($cal_x,$y+1.5);
+        $pdf->Cell($cal_w,5,$mes,0,0,'C');
+
+        $pdf->SetTextColor(30,30,30);
+        $pdf->SetFont('helvetica','B',22);
+        $pdf->SetXY($cal_x,$y+10);
+        $pdf->Cell($cal_w,15,$dia,0,0,'C');
+
+        $pdf->SetFont('helvetica','',9);
+        $pdf->SetXY($cal_x,$y+26);
+        $pdf->Cell($cal_w,5,$ano,0,0,'C');
+
+        /**
+         * ---------- Ubicación (icono vectorial) ----------
+         */
+        $icon_x = $cal_x + $cal_w + 12;
+
         $pdf->SetDrawColor(80,80,80);
         $pdf->SetFillColor(80,80,80);
         $pdf->Circle($icon_x,$y+8,1.5,0,360,'F');
@@ -196,12 +177,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetFont('helvetica','',11);
         $pdf->SetX($icon_x+4);
-        $pdf->MultiCell(160,5,$ubicacion);
+        $pdf->MultiCell(100,5,$ubicacion);
+
+        $y_after_location = $pdf->GetY();
 
         /**
          * ---------- Asistente ----------
          */
-        $pdf->Ln(6);
+        $pdf->SetAbsY($y_after_location + 6);
+
         $pdf->SetFont('helvetica','B',22);
         $pdf->SetTextColor(60,60,65);
         $pdf->Cell(0,12,$nombre_completo,0,1,'C');
@@ -213,9 +197,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         /**
          * ---------- QR ----------
          */
+        $y_qr = $pdf->GetY() + 4;
         $qr_size = 65;
         $qr_x = (210 - $qr_size) / 2;
-        $y_qr = $pdf->GetY() + 4;
 
         $pdf->SetFillColor(255,255,255);
         $pdf->RoundedRect($qr_x-4,$y_qr,$qr_size+8,$qr_size+8,4,'1111','F');
