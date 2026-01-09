@@ -122,38 +122,52 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-        /**
-         * CALENDARIO ESTILO "CALENDAR WIDGET"
+       /**
+         * CALENDARIO REALISTA "COLGADO"
          */
         $cal_x = 14; 
         $cal_y = 14; 
-        $cal_w = 35; // Un poco más ancho para mayor impacto
-        $cal_h = 38; // Un poco más alto para acomodar el diseño
+        $cal_w = 35; 
+        $cal_h = 40; // Aumentamos un poco el alto para la línea y el año
 
-        // 1. Sombra o borde suave para el cuerpo del calendario
+        // 1. Sombra de profundidad (efecto realista)
+        $pdf->SetFillColor(200, 200, 200);
+        $pdf->RoundedRect($cal_x + 0.5, $cal_y + 0.5, $cal_w, $cal_h, 3, '1111', 'F');
+
+        // 2. Cuerpo blanco principal
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 3, '1111', 'F');
         
-        // 2. Encabezado del Mes (Fondo Rojo o Gris Oscuro tipo calendario real)
-        $pdf->SetFillColor(220, 53, 69); // Rojo intenso tipo calendario
-        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 9, 3, '1100', 'F');
+        // 3. Encabezado (Azul Navy Profundo)
+        $pdf->SetFillColor(44, 62, 80); 
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 10, 3, '1100', 'F');
 
+        // --- DETALLE: Agujeros de calendario colgado ---
+        $pdf->SetFillColor(245, 245, 247); // Color del fondo del PDF para que parezca hueco
+        $pdf->Circle($cal_x + ($cal_w/4), $cal_y + 3, 1.2);
+        $pdf->Circle($cal_x + ($cal_w*3/4), $cal_y + 3, 1.2);
+
+        // 4. Texto del Mes
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 11);
-        $pdf->SetXY($cal_x, $cal_y + 2);
+        $pdf->SetXY($cal_x, $cal_y + 3.5);
         $pdf->Cell($cal_w, 5, $mes, 0, 0, 'C');
 
-        // 3. El Día (Número muy grande y enfatizado)
+        // 5. El Día (Número muy grande)
         $pdf->SetTextColor(30, 30, 30);
-        $pdf->SetFont('helvetica', 'B', 42); // Tamaño aumentado
-        $pdf->SetXY($cal_x, $cal_y + 10);
-        // Usamos una celda más alta para que el número respire
+        $pdf->SetFont('helvetica', 'B', 44);
+        $pdf->SetXY($cal_x, $cal_y + 11);
         $pdf->Cell($cal_w, 18, $dia, 0, 0, 'C');
 
-        // 4. El Año (Debajo, más sutil)
-        $pdf->SetTextColor(120, 120, 120);
+        // --- LÍNEA GRIS DIVISORIA ---
+        $pdf->SetDrawColor(210, 210, 210);
+        $pdf->SetLineWidth(0.3);
+        $pdf->Line($cal_x + 5, $cal_y + 31, $cal_x + $cal_w - 5, $cal_y + 31);
+
+        // 6. El Año (Debajo de la línea)
+        $pdf->SetTextColor(80, 80, 80);
         $pdf->SetFont('helvetica', 'B', 10);
-        $pdf->SetXY($cal_x, $cal_y + 29);
+        $pdf->SetXY($cal_x, $cal_y + 32.5);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
         /**
          * BADGE CONFIRMACIÓN (Centrado Dinámico Real)
