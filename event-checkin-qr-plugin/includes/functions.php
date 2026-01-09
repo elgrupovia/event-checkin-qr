@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR para el evento ID 50339 con calendario superpuesto y badge optimizado.
- * Version: 3.3.0
+ * Version: 3.4.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -103,7 +103,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(false,0);
         $pdf->AddPage();
 
-        // Fondo de la tarjeta (Gris muy claro)
+        // Fondo de la tarjeta
         $pdf->SetFillColor(245,245,247);
         $pdf->RoundedRect(8,8,194,279,6,'1111','F');
 
@@ -161,21 +161,19 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
         /**
-         * 3. BADGE CONFIRMACIÓN (ANCHO REDUCIDO Y CENTRADO)
+         * 3. BADGE CONFIRMACIÓN (Verde anterior y ancho medio)
          */
         $y_actual += 8;
-        $badge_w = 110; // Ancho reducido para mayor elegancia
-        $badge_x = (210 - $badge_w) / 2; // Centrado exacto
-        $badge_h = 10;
+        $badge_w = 145; // Un poco más largo que el anterior
+        $badge_x = (210 - $badge_w) / 2; // Centrado
+        $badge_h = 11;
 
-        // Color Verde Esmeralda
-        $pdf->SetFillColor(46, 184, 114); 
+        $pdf->SetFillColor(76, 175, 80); // Verde original solicitado
         $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 3, '1111', 'F');
 
-        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetFont('helvetica', 'B', 12);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetXY($badge_x, $y_actual);
-        // El símbolo ✔ se renderiza bien en Helvetica
         $pdf->Cell($badge_w, $badge_h, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
 
         $y_actual += 15;
@@ -185,13 +183,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          */
         $pdf->SetAbsY($y_actual);
         $pdf->SetFont('helvetica', '', 10);
-        $pdf->SetTextColor(120, 120, 120);
+        $pdf->SetTextColor(100, 100, 100);
         
         $fecha_texto = 'FECHA: ' . $fecha_formateada;
         $lugar_texto = 'LUGAR: ' . $ubicacion;
         
         $pdf->SetX(15);
-        $pdf->MultiCell(180, 5, $fecha_texto . '  |  ' . $lugar_texto, 0, 'C');
+        $pdf->MultiCell(180, 5, $fecha_texto . ' | ' . $lugar_texto, 0, 'C');
 
         $y_actual = $pdf->GetY() + 6;
 
@@ -200,7 +198,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          */
         $pdf->SetAbsY($y_actual);
         $pdf->SetFont('helvetica', 'B', 24);
-        $pdf->SetTextColor(40, 40, 45);
+        $pdf->SetTextColor(60, 60, 65);
         $pdf->Cell(0, 12, $nombre_completo, 0, 1, 'C');
 
         $pdf->SetFont('helvetica', 'B', 14);
@@ -211,13 +209,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          * 6. QR
          */
         $y_qr = $pdf->GetY() + 10;
-        $qr_size = 60;
+        $qr_size = 65;
         $qr_x = (210 - $qr_size) / 2;
 
         $pdf->SetFillColor(255, 255, 255);
-        // Recuadro blanco para el QR con una pequeña sombra visual (borde gris muy tenue)
-        $pdf->SetDrawColor(230, 230, 230);
-        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'DF');
+        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
 
         /**
