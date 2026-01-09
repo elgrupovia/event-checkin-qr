@@ -122,33 +122,33 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             }
         }
 
-            /**
-             * CALENDARIO SIMPLE (Día + Mes)
-             */
-            $cal_x = 14; 
-            $cal_y = 14; 
-            $cal_w = 32; 
-            $cal_h = 30;
+        /**
+         * CALENDARIO ULTRA COMPACTO (Día + Mes)
+         */
+        $cal_x = 14; 
+        $cal_y = 14; 
+        $cal_w = 26;   // mismo ancho para día y mes (más estrecho)
+        $cal_h = 22;   // altura total reducida
 
-            // Sombra suave
-            $pdf->SetFillColor(210, 210, 210);
-            $pdf->RoundedRect($cal_x + 0.6, $cal_y + 0.6, $cal_w, $cal_h, 3, '1111', 'F');
+        // Sombra sutil
+        $pdf->SetFillColor(215, 215, 215);
+        $pdf->RoundedRect($cal_x + 0.4, $cal_y + 0.4, $cal_w, $cal_h, 2.5, '1111', 'F');
 
-            // Fondo blanco
-            $pdf->SetFillColor(255, 255, 255);
-            $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 3, '1111', 'F');
+        // Fondo blanco
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.5, '1111', 'F');
 
-            // Día (grande y negrita)
-            $pdf->SetTextColor(30, 30, 30);
-            $pdf->SetFont('helvetica', 'B', 32);
-            $pdf->SetXY($cal_x, $cal_y + 4);
-            $pdf->Cell($cal_w, 16, $dia, 0, 0, 'C');
+        // Día (más pequeño pero dominante)
+        $pdf->SetTextColor(35, 35, 35);
+        $pdf->SetFont('helvetica', 'B', 26);
+        $pdf->SetXY($cal_x, $cal_y + 2);
+        $pdf->Cell($cal_w, 12, $dia, 0, 0, 'C');
 
-            // Mes (debajo, sin negrita)
-            $pdf->SetFont('helvetica', '', 11);
-            $pdf->SetTextColor(120, 120, 120);
-            $pdf->SetXY($cal_x, $cal_y + 20);
-            $pdf->Cell($cal_w, 6, ucfirst(strtolower($mes)), 0, 0, 'C');
+        // Mes (mismo ancho, más discreto)
+        $pdf->SetFont('helvetica', '', 9);
+        $pdf->SetTextColor(120, 120, 120);
+        $pdf->SetXY($cal_x, $cal_y + 14);
+        $pdf->Cell($cal_w, 6, ucfirst(strtolower($mes)), 0, 0, 'C');
 
         /**
          * BADGE CONFIRMACIÓN (Centrado Dinámico Real)
