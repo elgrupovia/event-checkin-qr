@@ -123,30 +123,38 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * CALENDARIO
+         * CALENDARIO ESTILO "CALENDAR WIDGET"
          */
-        $cal_x = 14; $cal_y = 14; $cal_w = 32; $cal_h = 30;
+        $cal_x = 14; 
+        $cal_y = 14; 
+        $cal_w = 35; // Un poco más ancho para mayor impacto
+        $cal_h = 38; // Un poco más alto para acomodar el diseño
 
-        $pdf->SetFillColor(255,255,255);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,3,'1111','F');
+        // 1. Sombra o borde suave para el cuerpo del calendario
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 3, '1111', 'F');
+        
+        // 2. Encabezado del Mes (Fondo Rojo o Gris Oscuro tipo calendario real)
+        $pdf->SetFillColor(220, 53, 69); // Rojo intenso tipo calendario
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 9, 3, '1100', 'F');
 
-        $pdf->SetFillColor(30,30,30);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,7,3,'1100','F');
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetXY($cal_x, $cal_y + 2);
+        $pdf->Cell($cal_w, 5, $mes, 0, 0, 'C');
 
-        $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','B',10);
-        $pdf->SetXY($cal_x,$cal_y+1);
-        $pdf->Cell($cal_w,5,$mes,0,0,'C');
+        // 3. El Día (Número muy grande y enfatizado)
+        $pdf->SetTextColor(30, 30, 30);
+        $pdf->SetFont('helvetica', 'B', 42); // Tamaño aumentado
+        $pdf->SetXY($cal_x, $cal_y + 10);
+        // Usamos una celda más alta para que el número respire
+        $pdf->Cell($cal_w, 18, $dia, 0, 0, 'C');
 
-        $pdf->SetTextColor(30,30,30);
-        $pdf->SetFont('helvetica','B',32);
-        $pdf->SetXY($cal_x,$cal_y+7);
-        $pdf->Cell($cal_w,16,$dia,0,0,'C');
-
-        $pdf->SetFont('helvetica','',9);
-        $pdf->SetXY($cal_x,$cal_y+23);
-        $pdf->Cell($cal_w,5,$ano,0,0,'C');
-
+        // 4. El Año (Debajo, más sutil)
+        $pdf->SetTextColor(120, 120, 120);
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY($cal_x, $cal_y + 29);
+        $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
         /**
          * BADGE CONFIRMACIÓN (Centrado Dinámico Real)
          */
