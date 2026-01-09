@@ -142,8 +142,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
          */
         $cal_x = 14; 
         $cal_y = 14;
-        $cal_w = 32;
-        $cal_h = 30;
+        $cal_w = 42;
+        $cal_h = 42;
 
         // Sombra/Fondo blanco del calendario
         $pdf->SetFillColor(255, 255, 255);
@@ -151,38 +151,38 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // Cabecera mes (Negro)
         $pdf->SetFillColor(30, 30, 30);
-        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 7, 3, '1100', 'F');
+        $pdf->RoundedRect($cal_x, $cal_y, $cal_w, 8, 3, '1100', 'F');
 
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('helvetica', 'B', 10);
         $pdf->SetXY($cal_x, $cal_y + 1);
-        $pdf->Cell($cal_w, 5, $mes, 0, 0, 'C');
+        $pdf->Cell($cal_w, 6, $mes, 0, 0, 'C');
 
-        // Día
+        // Día - MUCHO MÁS GRANDE
         $pdf->SetTextColor(30, 30, 30);
-        $pdf->SetFont('helvetica', 'B', 20);
-        $pdf->SetXY($cal_x, $cal_y + 9);
-        $pdf->Cell($cal_w, 12, $dia, 0, 0, 'C');
+        $pdf->SetFont('helvetica', 'B', 28);
+        $pdf->SetXY($cal_x, $cal_y + 10);
+        $pdf->Cell($cal_w, 16, $dia, 0, 0, 'C');
 
         // Año
         $pdf->SetFont('helvetica', '', 9);
-        $pdf->SetXY($cal_x, $cal_y + 22);
+        $pdf->SetXY($cal_x, $cal_y + 28);
         $pdf->Cell($cal_w, 5, $ano, 0, 0, 'C');
 
         /**
          * 3. BADGE CONFIRMACIÓN (Debajo de la imagen)
          */
         $y_actual += 6;
-        $badge_w = 180;
-        $badge_x = (210 - $badge_w) / 2;
+        $badge_w = 170;
+        $badge_x = 20;
 
         $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $y_actual, $badge_w, 10, 3, '1111', 'F');
 
-        $pdf->SetFont('helvetica', 'B', 11);
+        $pdf->SetFont('helvetica', 'B', 12);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetXY($badge_x, $y_actual + 1);
-        $pdf->Cell($badge_w, 8, '✓ ENTRADA CONFIRMADA', 0, 1, 'C');
+        $pdf->Cell($badge_w, 8, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
 
         $y_actual += 12;
 
