@@ -191,13 +191,14 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell($ancho_texto_real, 6, $texto_confirmacion, 0, 0, 'L');
 
         /**
-         * ✅ FECHA Y UBICACIÓN (AHORA DEBAJO DEL BADGE)
+         * ✅ FECHA Y UBICACIÓN 
          */
         $y_actual += 16;
-        $pdf->SetFont('helvetica','',10);
-        $pdf->SetTextColor(100,100,100);
+        $pdf->SetFont('helvetica','',13); 
+        $pdf->SetTextColor(50,50,50);    
         $pdf->SetXY(15, $y_actual);
-        $pdf->MultiCell(180,5,'FECHA: '.$fecha_formateada.' | LUGAR: '.$ubicacion,0,'C');
+        $pdf->MultiCell(180,6,'FECHA: '.$fecha_formateada.' | LUGAR: '.$ubicacion,0,'C'); 
+
 
         /**
          * ASISTENTE
