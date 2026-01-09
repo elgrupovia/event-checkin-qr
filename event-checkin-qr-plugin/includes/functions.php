@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho)
  * Description: Genera PDF con QR para el evento ID 50339.
- * Version: 3.0.2
+ * Version: 3.0.1
  */
 
 if (!defined('ABSPATH')) exit;
@@ -137,51 +137,46 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * ---------- CALENDARIO FLIP STYLE ----------
+         * ---------- Calendario (ARRIBA IZQUIERDA SOBRE LA IMAGEN)
          */
-        $cal_x = 12;
-        $cal_y = 12;
-        $cal_w = 62;
-        $cal_h = 60;
+       $cal_x = 14;
+    $cal_y = 14;
+    $cal_w = 46;
+    $cal_h = 44;
 
-        // Fondo NEGRO sólido del calendario
-        $pdf->SetFillColor(0,0,0);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,2,'1111','F');
+    // Fondo principal oscuro
+    $pdf->SetFillColor(45,45,48);
+    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111','F');
 
-        // BORDE REDONDEADO sutil (blanco muy claro)
-        $pdf->SetDrawColor(40,40,40);
-        $pdf->SetLineWidth(0.5);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,2,'1111');
+    // Borde claro
+    $pdf->SetDrawColor(90,90,95);
+    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,$cal_h,4,'1111');
 
-        // ===== SECCIÓN SUPERIOR: MES =====
-        $pdf->SetFillColor(0,0,0);
-        $pdf->RoundedRect($cal_x,$cal_y,$cal_w,8,2,'1100','F');
+    // Cabecera superior
+    $pdf->SetFillColor(30,30,32);
+    $pdf->RoundedRect($cal_x,$cal_y,$cal_w,10,4,'1100','F');
 
-        // Texto "MES" (o el mes del año: MAYO, ENERO, etc.)
-        $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','B',7);
-        $pdf->SetXY($cal_x,$cal_y+1.5);
-        $pdf->Cell($cal_w,5,$mes,0,0,'C');
+    // Anillas superiores
+    $pdf->SetFillColor(180,180,185);
+    $pdf->Circle($cal_x+10,$cal_y-1.5,1.6,0,360,'F');
+    $pdf->Circle($cal_x+$cal_w-10,$cal_y-1.5,1.6,0,360,'F');
 
-        // ===== SECCIÓN CENTRAL: DÍA =====
-        $pdf->SetFillColor(0,0,0);
-        $pdf->RoundedRect($cal_x,$cal_y+8,$cal_w,38,0,'0000','F');
+    // Mes
+    $pdf->SetTextColor(255,255,255);
+    $pdf->SetFont('helvetica','B',11);
+    $pdf->SetXY($cal_x,$cal_y+2);
+    $pdf->Cell($cal_w,6,$mes,0,0,'C');
 
-        // DÍA - ENORME, BOLD, BLANCO
-        $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','B',64);
-        $pdf->SetXY($cal_x,$cal_y+12);
-        $pdf->Cell($cal_w,28,$dia,0,0,'C');
+    // Día (MUY GRANDE)
+    $pdf->SetFont('helvetica','B',40);
+    $pdf->SetXY($cal_x,$cal_y+12);
+    $pdf->Cell($cal_w,20,$dia,0,0,'C');
 
-        // ===== SECCIÓN INFERIOR: AÑO =====
-        $pdf->SetFillColor(0,0,0);
-        $pdf->RoundedRect($cal_x,$cal_y+46,$cal_w,14,0,'0000','F');
-
-        // AÑO - Tipografía delgada (normal, no bold)
-        $pdf->SetTextColor(255,255,255);
-        $pdf->SetFont('helvetica','',10);
-        $pdf->SetXY($cal_x,$cal_y+50);
-        $pdf->Cell($cal_w,4,$ano,0,0,'C');
+    // Año
+    $pdf->SetFont('helvetica','',11);
+    $pdf->SetTextColor(210,210,215);
+    $pdf->SetXY($cal_x,$cal_y+33);
+    $pdf->Cell($cal_w,7,$ano,0,0,'C');
 
         /**
          * ---------- Ubicación ----------
