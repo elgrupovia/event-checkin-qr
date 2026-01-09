@@ -123,15 +123,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         }
 
         /**
-         * CALENDARIO ULTRA COMPACTO v2
-         * Más estrecho + mes más grande
+         * CALENDARIO ULTRA COMPACTO v3
+         * Mes más grande y dominante
          */
         $cal_x = 14; 
         $cal_y = 14; 
-        $cal_w = 22;   // ⬅️ más estrecho
-        $cal_h = 22;   
+        $cal_w = 22;   
+        $cal_h = 24;   // un poco más alto para respirar
 
-        // Sombra muy sutil
+        // Sombra sutil
         $pdf->SetFillColor(220, 220, 220);
         $pdf->RoundedRect($cal_x + 0.4, $cal_y + 0.4, $cal_w, $cal_h, 2.2, '1111', 'F');
 
@@ -139,17 +139,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.2, '1111', 'F');
 
-        // Día (compacto pero claro)
+        // Día (compacto)
         $pdf->SetTextColor(35, 35, 35);
-        $pdf->SetFont('helvetica', 'B', 24);
+        $pdf->SetFont('helvetica', 'B', 23);
         $pdf->SetXY($cal_x, $cal_y + 2);
-        $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
+        $pdf->Cell($cal_w, 10, $dia, 0, 0, 'C');
 
-        // Mes (más grande y legible)
-        $pdf->SetFont('helvetica', '', 11);
-        $pdf->SetTextColor(110, 110, 110);
+        // Mes (MUCHO más grande)
+        $pdf->SetFont('helvetica', '', 14);
+        $pdf->SetTextColor(95, 95, 95);
         $pdf->SetXY($cal_x, $cal_y + 13);
-        $pdf->Cell($cal_w, 7, ucfirst(strtolower($mes)), 0, 0, 'C');
+        $pdf->Cell($cal_w, 9, ucfirst(strtolower($mes)), 0, 0, 'C');
+
 
         /**
          * BADGE CONFIRMACIÓN (Centrado Dinámico Real)
