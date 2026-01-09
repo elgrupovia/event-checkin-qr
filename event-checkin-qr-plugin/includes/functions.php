@@ -61,7 +61,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // Datos evento
         $titulo_evento = get_the_title($post_id);
-        $ubicacion = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
+        $ubicacion_raw = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
+        $ubicacion = html_entity_decode($ubicacion_raw, ENT_QUOTES, 'UTF-8');
+
 
         $fecha_raw = get_post_meta($post_id, 'fecha', true);
         $ts = is_numeric($fecha_raw) ? $fecha_raw : strtotime($fecha_raw);
@@ -171,10 +173,18 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFillColor(76, 175, 80); // Verde original solicitado
         $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 3, '1111', 'F');
 
-        $pdf->SetFont('helvetica', 'B', 12);
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->SetXY($badge_x, $y_actual);
-        $pdf->Cell($badge_w, $badge_h, '✔ ENTRADA CONFIRMADA', 0, 1, 'C');
+
+        // Tick con ZapfDingbats
+        $pdf->SetFont('zapfdingbats', '', 12);
+        $pdf->SetXY($badge_x + 8, $y_actual + 2);
+        $pdf->Cell(6, 7, '3', 0, 0, 'C'); // "3" = ✔
+
+        // Texto con Helvetica
+        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetXY($badge_x + 16, $y_actual);
+        $pdf->Cell($badge_w - 20, $badge_h, 'ENTRADA CONFIRMADA', 0, 1, 'C');
+
 
         $y_actual += 15;
 
