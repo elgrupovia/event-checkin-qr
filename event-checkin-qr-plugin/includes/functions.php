@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho - Multi-Evento)
- * Description: Genera PDF con QR para una lista específica de eventos con calendario superpuesto y badge optimizado.
- * Version: 3.5.0
+ * Description: Genera PDF con QR para una lista específica de eventos con calendario superpuesto y badge optimizado. Soporta múltiples eventos por asistente.
+ * Version: 4.0.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -12,6 +12,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
+use TCPDF;
 
 /**
  * Función auxiliar para manejar imágenes y rutas locales
@@ -58,20 +59,63 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             51297
         ];
 
-        // Detectar el ID del evento actual desde el formulario
-        $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
-
-        // Validar si el ID es parte de la lista; si no, por defecto usamos el principal
-        if (!in_array($post_id, $eventos_permitidos)) {
-            $post_id = 50339; 
-        }
-
         // --- DATOS DEL ASISTENTE ---
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos = sanitize_text_field($request['apellidos'] ?? '');
         $nombre_completo = html_entity_decode(trim("$nombre $apellidos"), ENT_QUOTES, 'UTF-8');
 
+        // --- DETECTAR EVENTOS (puede ser un array de múltiples eventos o un evento único) ---
+        $eventos_seleccionados = [];
+        
+        // Opción 1: Si viene de un campo multi-select (ej: 'eventos_2025' como array)
+        if (!empty($request['eventos_2025']) && is_array($request['eventos_2025'])) {
+            foreach ($request['eventos_2025'] as $evento_item) {
+                $evento_id = intval($evento_item);
+                if (in_array($evento_id, $eventos_permitidos)) {
+                    $eventos_seleccionados[] = $evento_id;
+                }
+            }
+        }
+        
+        // Opción 2: Si viene un campo 'eventos' genérico (para compatibilidad)
+        if (empty($eventos_seleccionados) && !empty($request['eventos'])) {
+            $eventos = is_array($request['eventos']) ? $request['eventos'] : [$request['eventos']];
+            foreach ($eventos as $evento_item) {
+                $evento_id = intval($evento_item);
+                if (in_array($evento_id, $eventos_permitidos)) {
+                    $eventos_seleccionados[] = $evento_id;
+                }
+            }
+        }
+        
+        // Opción 3: Si viene un 'refer_post_id' (evento actual de la página)
+        if (empty($eventos_seleccionados)) {
+            $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
+            if (in_array($post_id, $eventos_permitidos)) {
+                $eventos_seleccionados[] = $post_id;
+            } else {
+                $eventos_seleccionados[] = 50339; // Por defecto
+            }
+        }
+
+        $upload_dir = wp_upload_dir();
+
+        // --- GENERAR UN PDF POR CADA EVENTO ---
+        foreach ($eventos_seleccionados as $post_id) {
+            generar_pdf_evento_individual($post_id, $nombre_completo, $nombre_empresa, $upload_dir);
+        }
+
+    } catch (Exception $e) {
+        error_log('❌ Error en Plugin QR (Múltiples eventos): '.$e->getMessage());
+    }
+}
+
+/**
+ * Función auxiliar: genera un PDF individual para un evento específico
+ */
+function generar_pdf_evento_individual($post_id, $nombre_completo, $nombre_empresa, $upload_dir) {
+    try {
         // --- DATOS DINÁMICOS DEL EVENTO ---
         $titulo_evento = get_the_title($post_id);
         $ubicacion_raw = get_post_meta($post_id, 'ubicacion-evento', true) ?: 'Ubicación no disponible';
@@ -83,8 +127,6 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $dia  = date('d', $ts);
         $mes  = strtoupper(date_i18n('M', $ts));
         $fecha_formateada = date('d/m/Y H:i', $ts);
-
-        $upload_dir = wp_upload_dir();
 
         /**
          * GENERACIÓN DE QR
@@ -225,9 +267,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
 
-        // Guardar archivo
+        // Guardar archivo - Nombre único con timestamp para evitar conflictos
         $slug = preg_replace('/[^a-z0-9]+/','-',strtolower(remove_accents($nombre_completo)));
-        $nombre_archivo = 'entrada_'.$post_id.'_'.$slug.'_'.time().'.pdf';
+        $nombre_archivo = 'entrada_'.$post_id.'_'.$slug.'_'.time().'_'.uniqid().'.pdf';
         $pdf_full_path = $upload_dir['basedir'].'/'.$nombre_archivo;
         
         $pdf->Output($pdf_full_path, 'F');
