@@ -1,13 +1,12 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho - Multi-Evento)
- * Description: Genera PDF con QR para una lista específica de eventos con calendario superpuesto y badge optimizado.
- * Version: 3.5.0
+ * Description: Genera PDF con QR detectando el ID del evento seleccionado en el formulario.
+ * Version: 3.6.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-// Carga de dependencias de Composer (Endroid QR y TCPDF)
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Endroid\QrCode\Builder\Builder;
@@ -49,7 +48,7 @@ add_action(
 function generar_qr_pdf_personalizado($request, $action_handler) {
 
     try {
-        // --- LISTA DE IDS DE EVENTOS PERMITIDOS ---
+        // --- CONFIGURACIÓN ---
         $eventos_permitidos = [
             50339, 50342, 50352, 50364, 50355, 50379, 50383, 52217, 51321, 50391,
             50414, 50420, 54395, 50432, 50435, 50438, 50442, 50445, 50451, 50466,
@@ -58,11 +57,25 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             51297
         ];
 
-        // Detectar el ID del evento actual desde el formulario
-        $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
+        /**
+         * DETECCIÓN DEL ID DEL EVENTO
+         * 1. Intentamos obtener el ID del campo 'post_id' o 'evento_seleccionado' del formulario.
+         * JetFormBuilder suele enviar el ID del objeto seleccionado si usas un campo 'Select' de posts.
+         */
+        $post_id = 0;
 
-        // Validar si el ID es parte de la lista; si no, por defecto usamos el principal
+        // Cambia 'post_id' por el nombre técnico de tu campo de selección en el formulario si es distinto
+        $nombre_campo_selector = 'post_id'; 
+
+        if (isset($request[$nombre_campo_selector]) && !empty($request[$nombre_campo_selector])) {
+            $post_id = intval($request[$nombre_campo_selector]);
+        } elseif (isset($request['refer_post_id'])) {
+            $post_id = intval($request['refer_post_id']);
+        }
+
+        // Si el ID detectado no está en la lista permitida, usamos el 50339 por defecto
         if (!in_array($post_id, $eventos_permitidos)) {
+            error_log("QR Plugin: ID detectado ($post_id) no está en la lista. Aplicando 50339.");
             $post_id = 50339; 
         }
 
@@ -93,7 +106,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
             'empresa' => $nombre_empresa,
             'nombre'  => $nombre_completo,
             'evento'  => $titulo_evento,
-            'ev_id'   => $post_id // ID del evento para facilitar el check-in
+            'ev_id'   => $post_id 
         ]);
 
         $qr = Builder::create()
@@ -121,7 +134,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect(8,8,194,279,6,'1111','F');
 
         /**
-         * IMAGEN DE CABECERA (Dinámica del Evento)
+         * IMAGEN DE CABECERA
          */
         $y_actual = 8;
         $img_url = get_the_post_thumbnail_url($post_id, 'full');
@@ -149,9 +162,9 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $cal_w = 22;
         $cal_h = 22;
 
-        $pdf->SetFillColor(220, 220, 220); // Sombra
+        $pdf->SetFillColor(220, 220, 220);
         $pdf->RoundedRect($cal_x + 0.4, $cal_y + 0.4, $cal_w, $cal_h, 2.2, '1111', 'F');
-        $pdf->SetFillColor(255, 255, 255); // Fondo
+        $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.2, '1111', 'F');
 
         $pdf->SetTextColor(35, 35, 35);
@@ -172,7 +185,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $badge_x = (210 - $badge_w) / 2;
         $badge_h = 11;
 
-        $pdf->SetFillColor(76, 175, 80); // Color verde
+        $pdf->SetFillColor(76, 175, 80);
         $pdf->RoundedRect($badge_x, $y_actual, $badge_w, $badge_h, 3, '1111', 'F');
 
         $pdf->SetTextColor(255, 255, 255);
@@ -187,7 +200,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetFont('zapfdingbats', '', 12);
         $pdf->SetXY($start_x, $y_actual + 2.5);
-        $pdf->Cell($tick_w, 6, '3', 0, 0, 'C'); // Tick de ZapfDingbats
+        $pdf->Cell($tick_w, 6, '3', 0, 0, 'C');
 
         $pdf->SetFont('helvetica', 'B', 12);
         $pdf->SetXY($start_x + $tick_w + $space, $y_actual + 2.5);
@@ -232,10 +245,10 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         
         $pdf->Output($pdf_full_path, 'F');
 
-        // Limpieza de QR temporal
-        @unlink($qr_path);
+        // Limpieza
+        if (file_exists($qr_path)) @unlink($qr_path);
 
     } catch (Exception $e) {
-        error_log('❌ Error en Plugin QR (Evento ID '.$post_id.'): '.$e->getMessage());
+        error_log('❌ Error en Plugin QR: '.$e->getMessage());
     }
 }
