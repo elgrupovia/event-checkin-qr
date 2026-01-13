@@ -59,11 +59,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         ];
 
         // Detectar el ID del evento actual desde el formulario
-        $post_id = isset($request['evento_id']) ? intval($request['evento_id']) : 0;
-        if (!$post_id || !in_array($post_id, $eventos_permitidos, true)) {
-            $post_id = 50339;
-        }
-
+        $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
 
         // Validar si el ID es parte de la lista; si no, por defecto usamos el principal
         if (!in_array($post_id, $eventos_permitidos)) {
@@ -74,6 +70,37 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $nombre_empresa = sanitize_text_field($request['nombre_de_empresa'] ?? 'Empresa Desconocida');
         $nombre = sanitize_text_field($request['nombre'] ?? 'Invitado');
         $apellidos = sanitize_text_field($request['apellidos'] ?? '');
+
+        // --- BÚSQUEDA DIFUSA DE EVENTO (eventos_2025) ---
+        $raw_evento = $request['eventos_2025'] ?? '';
+        
+        // Si es array, tomamos el primer valor para comparar
+        if (is_array($raw_evento)) {
+            $raw_evento = reset($raw_evento); 
+        }
+        $evento_formulario = sanitize_text_field($raw_evento);
+
+        if (!empty($evento_formulario)) {
+            $mejor_id = 0;
+            $max_similitud = 0;
+
+            foreach ($eventos_permitidos as $eid) {
+                $titulo = get_the_title($eid);
+                similar_text(mb_strtolower($evento_formulario), mb_strtolower($titulo), $porc);
+                
+                if ($porc > $max_similitud) {
+                    $max_similitud = $porc;
+                    $mejor_id = $eid;
+                }
+            }
+
+            // Asignar el mejor candidato
+            if ($mejor_id > 0) {
+                $post_id = $mejor_id;
+                error_log("🎯 Evento coincidente: '$evento_formulario' -> ID: $post_id ($max_similitud%)");
+            }
+        }
+
         $nombre_completo = html_entity_decode(trim("$nombre $apellidos"), ENT_QUOTES, 'UTF-8');
 
         // --- DATOS DINÁMICOS DEL EVENTO ---
