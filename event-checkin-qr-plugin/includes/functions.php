@@ -59,7 +59,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         ];
 
         // Detectar el ID del evento actual desde el formulario
-        $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
+        $post_id = isset($request['evento_id']) ? intval($request['evento_id']) : 0;
+        if (!$post_id || !in_array($post_id, $eventos_permitidos, true)) {
+            $post_id = 50339;
+        }
+
 
         // Validar si el ID es parte de la lista; si no, por defecto usamos el principal
         if (!in_array($post_id, $eventos_permitidos)) {
