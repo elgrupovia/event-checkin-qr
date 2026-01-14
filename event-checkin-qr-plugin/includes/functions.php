@@ -248,28 +248,34 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell(0,8,mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
 
         /**
-         * RENDERIZADO FINAL DEL QR (50% MÁS GRANDE)
+         * RENDERIZADO QR 
          */
-        $y_qr = $pdf->GetY() + 5; 
-        $qr_size = 98; 
-        $qr_x = (210 - $qr_size) / 2;
+        $pdf->Ln(2); 
+        $y_qr = $pdf->GetY(); 
+        
+        $qr_size = 115; 
+        $qr_x = (210 - $qr_size) / 2; 
+        $borde_minimal = 1; 
 
-        if (($y_qr + $qr_size) > 285) {
-            $y_qr = 285 - $qr_size; 
+        if (($y_qr + $qr_size) > 280) {
+            $y_qr = 280 - $qr_size; 
         }
 
         $pdf->SetFillColor(255,255,255);
-        // El recuadro blanco de fondo también crece proporcionalmente
-        $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
-        $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
+        $pdf->RoundedRect($qr_x - $borde_minimal, $y_qr, $qr_size + ($borde_minimal * 2), $qr_size + ($borde_minimal * 2), 2, '1111', 'F');
+        
+        // Imagen del QR
+        $pdf->Image($qr_path, $qr_x, $y_qr + $borde_minimal, $qr_size, $qr_size);
 
+        // --- GUARDADO Y CIERRE ---
         $slug = preg_replace('/[^a-z0-9]+/','-',strtolower(remove_accents($nombre_completo)));
         $nombre_archivo = 'entrada_'.$post_id.'_'.$slug.'_'.time().'.pdf';
-        $pdf_full_path = $upload_dir['basedir'] . '/' . $nombre_archivo;
-
+        $pdf_full_path = $upload_dir['basedir'].'/'.$nombre_archivo;
+        
+        // Guardar el archivo en el servidor
         $pdf->Output($pdf_full_path, 'F');
 
-        // 3. Limpieza de QR temporal
+        // Limpieza de QR temporal
         @unlink($qr_path);
 
     } catch (Exception $e) {
