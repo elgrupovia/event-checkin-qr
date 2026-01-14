@@ -196,11 +196,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->Cell($cal_w, 7, ucfirst(strtolower($mes)), 0, 0, 'C');
 
         /**
-         * BADGE "ENTRADA CONFIRMADA"
+         * BADGE "ENTRADA CONFIRMADA" (Versión Compacta)
          */
         $y_actual += 8;
-        $badge_w = 145;
-        $badge_x = (210 - $badge_w) / 2;
+        $badge_w = 80; // Antes era 145, ahora es más estrecho
+        $badge_x = (210 - $badge_w) / 2; // Recalcular centro
         $badge_h = 11;
 
         $pdf->SetFillColor(76, 175, 80); // Color verde
@@ -208,19 +208,21 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $pdf->SetTextColor(255, 255, 255);
         $texto_confirmacion = 'ENTRADA CONFIRMADA';
-        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetFont('helvetica', 'B', 11); // Bajamos un punto el tamaño para que quepa bien
         
         $ancho_texto_real = $pdf->GetStringWidth($texto_confirmacion);
         $tick_w = 6;
-        $space = 2;
+        $space = 1;
         $total_contenido_w = $tick_w + $space + $ancho_texto_real;
-        $start_x = (210 - $total_contenido_w) / 2;
+        
+        // El inicio del texto debe ser relativo al centro del badge
+        $start_x = $badge_x + ($badge_w - $total_contenido_w) / 2;
 
-        $pdf->SetFont('zapfdingbats', '', 12);
+        $pdf->SetFont('zapfdingbats', '', 11);
         $pdf->SetXY($start_x, $y_actual + 2.5);
-        $pdf->Cell($tick_w, 6, '3', 0, 0, 'C'); // Tick de ZapfDingbats
+        $pdf->Cell($tick_w, 6, '3', 0, 0, 'C'); 
 
-        $pdf->SetFont('helvetica', 'B', 12);
+        $pdf->SetFont('helvetica', 'B', 11);
         $pdf->SetXY($start_x + $tick_w + $space, $y_actual + 2.5);
         $pdf->Cell($ancho_texto_real, 6, $texto_confirmacion, 0, 0, 'L');
 
