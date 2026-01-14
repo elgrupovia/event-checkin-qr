@@ -250,8 +250,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         /**
          * RENDERIZADO FINAL DEL QR (50% MÁS GRANDE)
          */
-        $y_qr = $pdf->GetY() + 5; // Reducimos un poco el margen superior para ganar espacio
-        $qr_size = 98; // Aumentado de 65 a 98 (aprox 50% más grande)
+        $y_qr = $pdf->GetY() + 5; 
+        $qr_size = 98; 
         $qr_x = (210 - $qr_size) / 2;
 
         if (($y_qr + $qr_size) > 285) {
@@ -263,11 +263,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($qr_x - 4, $y_qr, $qr_size + 8, $qr_size + 8, 4, '1111', 'F');
         $pdf->Image($qr_path, $qr_x, $y_qr + 4, $qr_size, $qr_size);
 
-        // Guardar archivo
         $slug = preg_replace('/[^a-z0-9]+/','-',strtolower(remove_accents($nombre_completo)));
         $nombre_archivo = 'entrada_'.$post_id.'_'.$slug.'_'.time().'.pdf';
+        $pdf_full_path = $upload_dir['basedir'] . '/' . $nombre_archivo;
 
-        // Limpieza de QR temporal
+        $pdf->Output($pdf_full_path, 'F');
+
+        // 3. Limpieza de QR temporal
         @unlink($qr_path);
 
     } catch (Exception $e) {
