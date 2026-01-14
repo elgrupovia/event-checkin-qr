@@ -88,7 +88,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         // Usamos la ruta que me has indicado donde están los archivos
         $f_path = ABSPATH . 'wp-content/plugins/event-checkin-qr-plugin/vendor/tecnickcom/tcpdf/fonts/';
         $f_bold_file = $f_path . 'gotham-Bold.ttf';
-        $f_reg_file  = $f_path . 'Gotham-Book.ttf';
+        $f_reg_file  = $f_path . 'gotham-Book.ttf';
 
         error_log("---------- QR PLUGIN DEBUG ----------");
         error_log("Buscando fuentes en: " . $f_path);
