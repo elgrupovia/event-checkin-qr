@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Event Check-In QR (Integración Zoho - Multi-Evento)
- * Description: Genera PDF con QR, tipografía Gotham, badge compacto y QR maximizado.
- * Version: 3.5.2
+ * Description: Genera PDF con QR, tipografía Gotham certificada, badge compacto y QR maximizado.
+ * Version: 3.5.4
  */
 
 if (!defined('ABSPATH')) exit;
@@ -14,7 +14,15 @@ use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\PngWriter;
 
 /**
- * Función para manejar imágenes locales de WordPress
+ * Función auxiliar para limpiar nombres en el archivo
+ */
+function limpiar_nombre_archivo_qr($string) {
+    $string = str_replace(' ', '-', $string);
+    return preg_replace('/[^A-Za-z0-9\-]/', '', $string);
+}
+
+/**
+ * Función para manejar imágenes locales
  */
 function optimizar_imagen_para_pdf($imagen_url, $upload_dir){
     $tmp = null;
@@ -43,14 +51,7 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
     try {
         // --- CONFIGURACIÓN DE EVENTOS ---
-        $eventos_permitidos = [
-            50339, 50342, 50352, 50364, 50355, 50379, 50383, 52217, 51321, 50391,
-            50414, 50420, 54395, 50432, 50435, 50438, 50442, 50445, 50451, 50466,
-            50469, 51324, 50490, 50520, 50530, 50533, 50605, 51033, 50493, 51448,
-            51037, 51237, 51269, 51272, 51282, 54163, 51301, 51285, 51291, 51294,
-            51297
-        ];
-
+        $eventos_permitidos = [50339, 50342, 50352, 50364, 50355, 50379, 50383, 52217, 51321, 50391, 50414, 50420, 54395, 50432, 50435, 50438, 50442, 50445, 50451, 50466, 50469, 51324, 50490, 50520, 50530, 50533, 50605, 51033, 50493, 51448, 51037, 51237, 51269, 51272, 51282, 54163, 51301, 51285, 51291, 51294, 51297];
         $post_id = isset($request['refer_post_id']) ? intval($request['refer_post_id']) : get_the_ID();
         if (!in_array($post_id, $eventos_permitidos)) { $post_id = 50339; }
 
@@ -69,13 +70,13 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         $upload_dir = wp_upload_dir();
 
-        // --- GENERACIÓN DE QR ---
+        // --- QR GENERACIÓN (Margen 0 para aprovechar espacio) ---
         $qr_url = home_url('/checkin/?') . http_build_query(['empresa' => $nombre_empresa, 'nombre' => $nombre_completo, 'evento' => $titulo_evento, 'ev_id' => $post_id]);
-        $qr = Builder::create()->writer(new PngWriter())->data($qr_url)->size(300)->margin(0)->build();
+        $qr = Builder::create()->writer(new PngWriter())->data($qr_url)->size(500)->margin(0)->build();
         $qr_path = $upload_dir['basedir'].'/qr_'.uniqid().'.png';
         $qr->saveToFile($qr_path);
 
-        // --- INICIO DE PDF ---
+        // --- INICIO TCPDF ---
         $pdf = new TCPDF('P','mm','A4',true,'UTF-8',false);
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(false);
@@ -83,56 +84,56 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetAutoPageBreak(false,0);
         $pdf->AddPage();
 
-        // --- REGISTRO SEGURO DE FUENTE GOTHAM ---
+        // --- LÓGICA DE FUENTES CON LOGS ---
         $f_path = __DIR__ . '/fonts/';
-        $f_bold = $f_path . 'gotham-Bold.ttf';
-        $f_book = $f_path . 'Gotham-Book.otf';
+        $f_bold_file = $f_path . 'gotham-Bold.ttf';
+        $f_reg_file  = $f_path . 'Gotham-Book.ttf';
 
-        if (file_exists($f_bold) && file_exists($f_book)) {
-            $gotham_b = TCPDF_FONTS::addTTFfont($f_bold, 'TrueTypeUnicode', '', 96);
-            $gotham_r = TCPDF_FONTS::addTTFfont($f_book, 'TrueTypeUnicode', '', 96);
+        error_log("---------- QR PLUGIN DEBUG ----------");
+        if (file_exists($f_bold_file) && file_exists($f_reg_file)) {
+            $gotham_b = TCPDF_FONTS::addTTFfont($f_bold_file, 'TrueTypeUnicode', '', 96);
+            $gotham_r = TCPDF_FONTS::addTTFfont($f_reg_file, 'TrueTypeUnicode', '', 96);
+            error_log("STATUS: Fuentes Gotham detectadas y procesadas.");
+            error_log("BOLD ID: $gotham_b | REGULAR ID: $gotham_r");
         } else {
             $gotham_b = 'helveticaB';
             $gotham_r = 'helvetica';
+            error_log("STATUS: ERROR - No se encontraron los archivos .ttf en $f_path. Usando Helvetica.");
         }
 
-        // Fondo del Ticket
+        // Fondo Estético
         $pdf->SetFillColor(245,245,247);
         $pdf->RoundedRect(8,8,194,279,6,'1111','F');
 
-        // Imagen de Cabecera
+        // Cabecera (Imagen)
         $y_actual = 8;
         $img_url = get_the_post_thumbnail_url($post_id, 'full');
         if ($img_url) {
-            $img = optimizar_imagen_para_pdf($img_url, $upload_dir);
-            if (file_exists($img['path'])) {
-                list($w,$h) = getimagesize($img['path']);
+            $img_res = optimizar_imagen_para_pdf($img_url, $upload_dir);
+            if (file_exists($img_res['path'])) {
+                list($w,$h) = getimagesize($img_res['path']);
                 $alto = min(($h * 194) / $w, 100);
-                $pdf->StartTransform();
-                $pdf->RoundedRect(8,8,194,$alto,6,'1111','CNZ');
-                $pdf->Image($img['path'],8,8,194,$alto);
-                $pdf->StopTransform();
+                $pdf->Image($img_res['path'],8,8,194,$alto,'','','',false,300,'',false,false,0,'TL',false,false);
                 $y_actual = 8 + $alto;
             }
         }
 
-        // Calendario Superpuesto
+        // --- ICONO CALENDARIO (GOTHAM) ---
         $cal_x = 14; $cal_y = 14; $cal_w = 22; $cal_h = 22;
-        $pdf->SetFillColor(220, 220, 220);
-        $pdf->RoundedRect($cal_x + 0.4, $cal_y + 0.4, $cal_w, $cal_h, 2.2, '1111', 'F');
         $pdf->SetFillColor(255, 255, 255);
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.2, '1111', 'F');
 
         $pdf->SetTextColor(35, 35, 35);
-        $pdf->SetFont($gotham_b, 'B', 24);
+        $pdf->SetFont($gotham_b, 'B', 24); // Numero en Gotham Bold
         $pdf->SetXY($cal_x, $cal_y + 2);
         $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
-        $pdf->SetFont($gotham_r, '', 11);
+
+        $pdf->SetFont($gotham_r, '', 11); // Mes en Gotham Regular
         $pdf->SetTextColor(110, 110, 110);
         $pdf->SetXY($cal_x, $cal_y + 13);
         $pdf->Cell($cal_w, 7, ucfirst(strtolower($mes)), 0, 0, 'C');
 
-        // Badge "Entrada Confirmada"
+        // --- BADGE CONFIRMACIÓN ---
         $y_actual += 8;
         $badge_w = 80; $badge_x = (210 - $badge_w) / 2;
         $pdf->SetFillColor(76, 175, 80);
@@ -141,52 +142,60 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFont($gotham_b, 'B', 11);
         $tw = $pdf->GetStringWidth('ENTRADA CONFIRMADA');
         $start_x = $badge_x + ($badge_w - (6 + 1 + $tw)) / 2;
-        $pdf->SetFont('zapfdingbats', '', 11);
+        
+        $pdf->SetFont('zapfdingbats', '', 11); // Icono Tick
         $pdf->SetXY($start_x, $y_actual + 2.5);
         $pdf->Cell(6, 6, '3', 0, 0, 'C');
+        
         $pdf->SetFont($gotham_b, 'B', 11);
         $pdf->SetXY($start_x + 7, $y_actual + 2.5);
         $pdf->Cell($tw, 6, 'ENTRADA CONFIRMADA', 0, 0, 'L');
 
-        // Fecha y Lugar
+        // --- DATOS DEL EVENTO ---
         $y_actual += 16;
         $pdf->SetFont($gotham_r, '', 13);
         $pdf->SetTextColor(50,50,50);
         $pdf->SetXY(15, $y_actual);
         $pdf->MultiCell(180,6,'FECHA: '.$fecha_formateada.' | LUGAR: '.$ubicacion,0,'C');
 
-        // Nombre del Asistente
+        // --- NOMBRE ASISTENTE ---
         $pdf->Ln(6);
-        $pdf->SetFont($gotham_b, 'B', 24);
+        $pdf->SetFont($gotham_b, 'B', 26);
         $pdf->SetTextColor(60,60,65);
-        $pdf->Cell(0,12,$nombre_completo,0,1,'C');
+        $pdf->Cell(0,12, mb_strtoupper($nombre_completo, 'UTF-8'),0,1,'C');
+        
         $pdf->SetFont($gotham_b, 'B', 14);
         $pdf->SetTextColor(100,100,105);
-        $pdf->Cell(0,8,mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
+        $pdf->Cell(0,8, mb_strtoupper($nombre_empresa,'UTF-8'),0,1,'C');
 
-        // QR MAXIMIZADO
+        // --- QR EL MÁS GRANDE POSIBLE ---
         $pdf->Ln(2);
         $y_qr = $pdf->GetY();
-        $qr_size = 115;
-        $qr_x = (210 - $qr_size) / 2;
-        $b_min = 1;
+        $qr_display_size = 120; // Aumentado a 120mm
+        $qr_x = (210 - $qr_display_size) / 2;
+        
+        // Evitar que el QR se salga de la página
+        if (($y_qr + $qr_display_size) > 282) {
+            $y_qr = 282 - $qr_display_size;
+        }
 
-        if (($y_qr + $qr_size) > 280) { $y_qr = 280 - $qr_size; }
-
+        // Borde blanco mínimo (1mm)
         $pdf->SetFillColor(255,255,255);
-        $pdf->RoundedRect($qr_x - $b_min, $y_qr, $qr_size + ($b_min * 2), $qr_size + ($b_min * 2), 2, '1111', 'F');
-        $pdf->Image($qr_path, $qr_x, $y_qr + $b_min, $qr_size, $qr_size);
+        $pdf->RoundedRect($qr_x - 1, $y_qr, $qr_display_size + 2, $qr_display_size + 2, 2, '1111', 'F');
+        $pdf->Image($qr_path, $qr_x, $y_qr + 1, $qr_display_size, $qr_display_size);
 
-        // --- SALIDA FINAL ---
-        $slug = preg_replace('/[^a-z0-9]+/','-',strtolower(remove_accents($nombre_completo)));
-        $pdf_full_path = $upload_dir['basedir'].'/entrada_'.$post_id.'_'.$slug.'_'.time().'.pdf';
+        // --- FINALIZACIÓN ---
+        $safe_name = limpiar_nombre_archivo_qr($nombre_completo);
+        $filename = 'entrada_'.$post_id.'_'.$safe_name.'_'.time().'.pdf';
+        $full_path = $upload_dir['basedir'].'/'.$filename;
         
-        $pdf->Output($pdf_full_path, 'F');
-        
-        // Limpieza
+        $pdf->Output($full_path, 'F');
+        error_log("SUCCESS: PDF Generado en $full_path");
+        error_log("-------------------------------------");
+
         if (file_exists($qr_path)) { @unlink($qr_path); }
 
     } catch (Exception $e) {
-        error_log('❌ Error Plugin QR: '.$e->getMessage());
+        error_log('❌ FATAL ERROR QR PLUGIN: '.$e->getMessage());
     }
 }
