@@ -85,8 +85,8 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
 
         // --- REGISTRO SEGURO DE FUENTE GOTHAM ---
         $f_path = __DIR__ . '/fonts/';
-        $f_bold = $f_path . 'Gotham-Bold.ttf';
-        $f_book = $f_path . 'Gotham-Book.ttf';
+        $f_bold = $f_path . 'gotham-Bold.ttf';
+        $f_book = $f_path . 'Gotham-Book.otf';
 
         if (file_exists($f_bold) && file_exists($f_book)) {
             $gotham_b = TCPDF_FONTS::addTTFfont($f_bold, 'TrueTypeUnicode', '', 96);
