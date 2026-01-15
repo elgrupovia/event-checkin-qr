@@ -190,10 +190,16 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $cal_y + 2);
         $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
 
-        $pdf->SetFont('gothambook', '', 11);
-        $pdf->SetTextColor(110, 110, 110);
+        $pdf->SetFont('gothambook', '', 11); // Mes
+        $pdf->SetTextColor(80, 80, 80);
         $pdf->SetXY($cal_x, $cal_y + 13);
-        $pdf->Cell($cal_w, 7, ucfirst(strtolower($mes)), 0, 0, 'C');
+        $mes_texto = ucfirst(strtolower($mes));
+
+        // Dibujar el texto 2 veces con un pequeño desplazamiento horizontal
+        $pdf->Cell($cal_w, 7, $mes_texto, 0, 0, 'C');
+        $pdf->SetXY($cal_x + 0.2, $cal_y + 13);
+        $pdf->Cell($cal_w, 7, $mes_texto, 0, 0, 'C');
+
 
         /**
          * BADGE "ENTRADA CONFIRMADA" (Versión Compacta)
