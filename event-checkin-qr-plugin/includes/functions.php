@@ -186,11 +186,11 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.2, '1111', 'F');
 
         $pdf->SetTextColor(35, 35, 35);
-        $pdf->SetFont('gotham_bold', '', 24);
+        $pdf->SetFont('gothamb', '', 24);
         $pdf->SetXY($cal_x, $cal_y + 2);
         $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
 
-        $pdf->SetFont('gotham_book', '', 11);
+        $pdf->SetFont('gothambook', '', 11);
         $pdf->SetTextColor(110, 110, 110);
         $pdf->SetXY($cal_x, $cal_y + 13);
         $pdf->Cell($cal_w, 7, ucfirst(strtolower($mes)), 0, 0, 'C');
