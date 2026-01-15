@@ -185,27 +185,30 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetFillColor(255, 255, 255); // Fondo
         $pdf->RoundedRect($cal_x, $cal_y, $cal_w, $cal_h, 2.2, '1111', 'F');
 
+       // ----- NÚMERO DEL DÍA -----
+        $pdf->SetFont('gothamb', '', 24); // Día: peso 800
         $pdf->SetTextColor(35, 35, 35);
-        $pdf->SetFont('gothamb', '', 24);
         $pdf->SetXY($cal_x, $cal_y + 2);
         $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
 
-       // MES: mucho más grande, gris, relleno sutil
-        $mes_size = 18; // tamaño grande para destacar
-        $pdf->SetFont('gothambook', '', $mes_size); // Book (peso 400)
-        $pdf->SetTextColor(100, 100, 100); // Gris medio
+        // ----- MES -----
+        $mes_size = 18; // Mes grande
+        $pdf->SetFont('gothambook', '', $mes_size); // Book 400
+        $pdf->SetTextColor(100, 100, 100); // Gris
 
         $mes_texto = ucfirst(strtolower($mes));
-        $pdf->SetXY($cal_x, $cal_y + 13);
 
-        // Relleno sutil: solo 2 pasadas muy cercanas
+        // Reducimos espacio vertical: colocamos el mes más cerca del día
+        $mes_y = $cal_y + 9; // Antes 13, ahora 9 → menos separación
+
+        // Relleno sutil: 2 pasadas cercanas para dar grosor ligero
         $offsets = [
             [0, 0],
             [0.05, 0],
         ];
 
         foreach ($offsets as $o) {
-            $pdf->SetXY($cal_x + $o[0], $cal_y + 13 + $o[1]);
+            $pdf->SetXY($cal_x + $o[0], $mes_y + $o[1]);
             $pdf->Cell($cal_w, 7, $mes_texto, 0, 0, 'C');
         }
 
