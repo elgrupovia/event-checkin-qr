@@ -1,12 +1,16 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // Cargar TCPDF
 require_once __DIR__ . '/vendor/tecnickcom/tcpdf/tcpdf.php';
 require_once __DIR__ . '/vendor/tecnickcom/tcpdf/tools/tcpdf_addfont.php';
 
-// Cambia esta ruta si tus TTF están en otro sitio
+// Ruta a las fuentes
 $fonts_dir = __DIR__ . '/vendor/tecnickcom/tcpdf/fonts/';
 
-AddFont($fonts_dir . 'gotham-Bold.ttf', '', 'TrueTypeUnicode', true);
-AddFont($fonts_dir . 'gotham-Book.ttf', '', 'TrueTypeUnicode', true);
+// Generar fuentes TCPDF desde TTF
+AddFont($fonts_dir . 'gotham-bold.ttf', '', 'TrueTypeUnicode', true);
+AddFont($fonts_dir . 'gotham-book.ttf', '', 'TrueTypeUnicode', true);
 
-echo '✅ Fuentes Gotham generadas correctamente';
+echo '✅ Gotham convertida correctamente';
