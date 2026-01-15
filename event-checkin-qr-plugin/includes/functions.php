@@ -190,15 +190,15 @@ function generar_qr_pdf_personalizado($request, $action_handler) {
         $pdf->SetXY($cal_x, $cal_y + 2);
         $pdf->Cell($cal_w, 11, $dia, 0, 0, 'C');
 
-       // MES: más grande y relleno muy sutil
-        $mes_size = round(24 * 0.5); // 50% del día -> 12 pt
-        $pdf->SetFont('gothambook', '', $mes_size);
+       // MES: mucho más grande, gris, relleno sutil
+        $mes_size = 18; // tamaño grande para destacar
+        $pdf->SetFont('gothambook', '', $mes_size); // Book (peso 400)
         $pdf->SetTextColor(100, 100, 100); // Gris medio
 
         $mes_texto = ucfirst(strtolower($mes));
         $pdf->SetXY($cal_x, $cal_y + 13);
 
-        // Dibuja el texto 2 veces, pero casi sin desplazamiento
+        // Relleno sutil: solo 2 pasadas muy cercanas
         $offsets = [
             [0, 0],
             [0.05, 0],
